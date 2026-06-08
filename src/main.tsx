@@ -1,14 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import type { Session } from '@supabase/supabase-js';
 import {
-  Camera,
   CalendarHeart,
   Heart,
-  ImagePlus,
+  LoaderCircle,
   Lock,
+  LogOut,
   Plus,
   Send,
   Sparkles,
+  Trash2,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import {
@@ -20,7 +23,19 @@ import {
   useTransform,
 } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
+import { supabase } from './supabaseClient';
 import './styles.css';
+
+type MilestoneRow = {
+  id: string;
+  date: string;
+  title: string;
+  description: string;
+  image_url: string | null;
+  photo_path: string | null;
+  added_by: string;
+  created_at?: string;
+};
 
 type Milestone = {
   id: string;
@@ -28,52 +43,21 @@ type Milestone = {
   title: string;
   description: string;
   imageUrl: string;
+  photoPath: string | null;
   addedBy: string;
 };
 
-type DraftMilestone = Omit<Milestone, 'id'>;
+type DraftMilestone = {
+  date: string;
+  title: string;
+  description: string;
+  addedBy: string;
+  photoFile: File | null;
+};
 
 const anniversary = new Date('2026-05-15T20:00:00+05:30');
-const localKey = 'romance.timeline.milestones.v1';
-
-const starterMilestones: Milestone[] = [
-  {
-    id: 'first-photo',
-    date: '2026-05-15',
-    title: 'The First Photo Together',
-    description: "You laughed because I blinked, and somehow that made it perfect.",
-    imageUrl:
-      'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=1200&q=85',
-    addedBy: 'Sudev',
-  },
-  {
-    id: 'ice-cream',
-    date: '2026-05-21',
-    title: 'Our First Ice Cream Date',
-    description: 'Two spoons, one terrible joke, and a memory that kept glowing after sunset.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=1200&q=85',
-    addedBy: 'Her',
-  },
-  {
-    id: 'rain-walk',
-    date: '2026-05-29',
-    title: 'Rain Walk',
-    description: 'The umbrella was too small, which turned out to be the best possible problem.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1501901609772-df0848060b33?auto=format&fit=crop&w=1200&q=85',
-    addedBy: 'Sudev',
-  },
-  {
-    id: 'midnight-note',
-    date: '2026-06-03',
-    title: 'The Midnight Note',
-    description: 'A tiny message at exactly the right minute. Saved, reread, treasured.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=1200&q=85',
-    addedBy: 'Her',
-  },
-];
+const fallbackImage =
+  'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1200&q=85';
 
 function useNow() {
   const [now, setNow] = useState(() => new Date());
@@ -97,22 +81,60 @@ function getElapsedParts(now: Date) {
   return { days, hours, minutes, seconds };
 }
 
-function readLocalMilestones() {
-  const saved = localStorage.getItem(localKey);
-  if (!saved) return starterMilestones;
-
-  try {
-    return JSON.parse(saved) as Milestone[];
-  } catch {
-    return starterMilestones;
+async function resolveImageUrl(row: MilestoneRow) {
+  if (row.photo_path) {
+    const { data } = await supabase.storage.from('photos').createSignedUrl(row.photo_path, 60 * 60);
+    if (data?.signedUrl) return data.signedUrl;
   }
+
+  return row.image_url || fallbackImage;
+}
+
+async function mapMilestone(row: MilestoneRow): Promise<Milestone> {
+  return {
+    id: row.id,
+    date: row.date,
+    title: row.title,
+    description: row.description,
+    imageUrl: await resolveImageUrl(row),
+    photoPath: row.photo_path,
+    addedBy: row.added_by,
+  };
 }
 
 function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (authLoading) return <LoadingScreen />;
+  if (!session) return <AuthScreen />;
+
+  return <TimelineApp session={session} />;
+}
+
+function TimelineApp({ session }: { session: Session }) {
   const now = useNow();
   const elapsed = getElapsedParts(now);
-  const [milestones, setMilestones] = useState<Milestone[]>(readLocalMilestones);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState('');
   const [burst, setBurst] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -122,9 +144,38 @@ function App() {
   const smoothProgress = useSpring(scrollYProgress, { stiffness: 80, damping: 24 });
   const lineHeight = useTransform(smoothProgress, [0, 1], ['0%', '100%']);
 
+  async function loadMilestones() {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('milestones')
+      .select('id,date,title,description,image_url,photo_path,added_by,created_at')
+      .order('date', { ascending: true });
+
+    if (error) {
+      setStatus(`Could not load memories: ${error.message}`);
+      setIsLoading(false);
+      return;
+    }
+
+    const mapped = await Promise.all((data || []).map((row) => mapMilestone(row as MilestoneRow)));
+    setMilestones(mapped);
+    setIsLoading(false);
+  }
+
   useEffect(() => {
-    localStorage.setItem(localKey, JSON.stringify(milestones));
-  }, [milestones]);
+    loadMilestones();
+
+    const channel = supabase
+      .channel('milestones-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, () => {
+        loadMilestones();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useMotionValueEvent(smoothProgress, 'change', (latest) => {
     if (latest > 0.97) setBurst((value) => value + 1);
@@ -135,21 +186,83 @@ function App() {
     [milestones],
   );
 
-  function addMilestone(draft: DraftMilestone) {
-    setMilestones((items) => [
-      ...items,
-      {
-        ...draft,
-        id: crypto.randomUUID(),
-      },
-    ]);
-    setBurst((value) => value + 1);
-    setIsPanelOpen(false);
+  async function addMilestone(draft: DraftMilestone) {
+    setStatus('Uploading memory...');
+
+    try {
+      let imageUrl = '';
+      let photoPath: string | null = null;
+
+      if (draft.photoFile) {
+        const extension = draft.photoFile.name.split('.').pop() || 'jpg';
+        const safeName = `${crypto.randomUUID()}.${extension.toLowerCase()}`;
+        photoPath = `${session.user.id}/${safeName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('photos')
+          .upload(photoPath, draft.photoFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data } = await supabase.storage.from('photos').getPublicUrl(photoPath);
+        imageUrl = data.publicUrl;
+      }
+
+      const { error } = await supabase.from('milestones').insert({
+        date: draft.date,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        image_url: imageUrl || fallbackImage,
+        photo_path: photoPath,
+        added_by: draft.addedBy.trim() || session.user.email || 'Us',
+      });
+
+      if (error) throw error;
+
+      setBurst((value) => value + 1);
+      setIsPanelOpen(false);
+      setStatus('Memory added.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not add memory.');
+    }
+  }
+
+  async function deleteMilestone(item: Milestone) {
+    const confirmed = window.confirm(`Remove "${item.title}" from the timeline?`);
+    if (!confirmed) return;
+
+    setStatus('Removing memory...');
+
+    try {
+      if (item.photoPath) {
+        const { error: storageError } = await supabase.storage.from('photos').remove([item.photoPath]);
+        if (storageError) throw storageError;
+      }
+
+      const { error } = await supabase.from('milestones').delete().eq('id', item.id);
+      if (error) throw error;
+
+      setMilestones((items) => items.filter((current) => current.id !== item.id));
+      setStatus('Memory removed.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Could not remove memory.');
+    }
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
   }
 
   return (
     <main>
       <FloatingHearts keySeed={burst} />
+      <button className="sign-out" onClick={signOut}>
+        <LogOut size={17} />
+        Sign out
+      </button>
+
       <section className="hero">
         <div className="hero-media" aria-hidden="true" />
         <div className="hero-content">
@@ -183,6 +296,8 @@ function App() {
         </div>
       </section>
 
+      {status && <div className="status-pill">{status}</div>}
+
       <section className="memory-strip" aria-label="Pinned memories">
         {sortedMilestones.slice(0, 4).map((item) => (
           <motion.img
@@ -199,9 +314,26 @@ function App() {
         <div className="timeline-line">
           <motion.div className="timeline-line-fill" style={{ height: lineHeight }} />
         </div>
-        {sortedMilestones.map((item, index) => (
-          <TimelineCard key={item.id} item={item} isEven={index % 2 === 0} />
-        ))}
+        {isLoading ? (
+          <div className="empty-state">
+            <LoaderCircle className="spin" size={26} />
+            Loading our memories...
+          </div>
+        ) : sortedMilestones.length ? (
+          sortedMilestones.map((item, index) => (
+            <TimelineCard
+              key={item.id}
+              item={item}
+              isEven={index % 2 === 0}
+              onDelete={() => deleteMilestone(item)}
+            />
+          ))
+        ) : (
+          <div className="empty-state">
+            <Heart size={28} fill="currentColor" />
+            Add your first shared memory.
+          </div>
+        )}
       </section>
 
       <motion.button
@@ -217,11 +349,86 @@ function App() {
       <AnimatePresence>
         {isPanelOpen && (
           <ContributorPanel
+            defaultName={session.user.email || ''}
             onClose={() => setIsPanelOpen(false)}
             onSubmit={addMilestone}
           />
         )}
       </AnimatePresence>
+    </main>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <main className="auth-page">
+      <LoaderCircle className="spin" size={34} />
+    </main>
+  );
+}
+
+function AuthScreen() {
+  const [userId, setUserId] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function signIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: userId.trim(),
+      password,
+    });
+
+    setLoading(false);
+    if (error) setMessage(error.message);
+  }
+
+  return (
+    <main className="auth-page">
+      <motion.form
+        className="auth-card"
+        onSubmit={signIn}
+        initial={{ opacity: 0, y: 20, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: 'spring', stiffness: 130, damping: 18 }}
+      >
+        <div className="auth-mark">
+          <Lock size={32} />
+        </div>
+        <p className="eyebrow auth-eyebrow">Private timeline</p>
+        <h1>Our Little Timeline</h1>
+        <label>
+          <span>User ID</span>
+          <input
+            required
+            type="email"
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+            placeholder="your@email.com"
+            autoComplete="email"
+          />
+        </label>
+        <label>
+          <span>Password</span>
+          <input
+            required
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="your private password"
+            autoComplete="current-password"
+          />
+        </label>
+        {message && <p className="form-message">{message}</p>}
+        <button className="primary-button" type="submit" disabled={loading}>
+          {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
+          Sign in
+        </button>
+      </motion.form>
     </main>
   );
 }
@@ -239,7 +446,15 @@ function TimePill({ value, label, pulse = false }: { value: number; label: strin
   );
 }
 
-function TimelineCard({ item, isEven }: { item: Milestone; isEven: boolean }) {
+function TimelineCard({
+  item,
+  isEven,
+  onDelete,
+}: {
+  item: Milestone;
+  isEven: boolean;
+  onDelete: () => void;
+}) {
   const rotate = isEven ? -1.6 : 1.6;
 
   return (
@@ -255,6 +470,9 @@ function TimelineCard({ item, isEven }: { item: Milestone; isEven: boolean }) {
       </div>
       <motion.div className="photo-frame" whileHover={{ scale: 1.045, rotate: 0 }} style={{ rotate }}>
         <img src={item.imageUrl} alt={item.title} loading="lazy" />
+        <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
+          <Trash2 size={18} />
+        </button>
         <div className="tape tape-a" />
         <div className="tape tape-b" />
       </motion.div>
@@ -272,45 +490,38 @@ function TimelineCard({ item, isEven }: { item: Milestone; isEven: boolean }) {
 }
 
 function ContributorPanel({
+  defaultName,
   onClose,
   onSubmit,
 }: {
+  defaultName: string;
   onClose: () => void;
   onSubmit: (draft: DraftMilestone) => void;
 }) {
-  const [unlocked, setUnlocked] = useState(false);
-  const [password, setPassword] = useState('');
   const [draft, setDraft] = useState<DraftMilestone>({
     date: format(new Date(), 'yyyy-MM-dd'),
     title: '',
     description: '',
-    imageUrl: '',
-    addedBy: '',
+    addedBy: defaultName,
+    photoFile: null,
   });
   const [preview, setPreview] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   function handlePhoto(file?: File) {
     if (!file) return;
+    setDraft((current) => ({ ...current, photoFile: file }));
+
     const reader = new FileReader();
-    reader.onload = () => {
-      const result = String(reader.result);
-      setPreview(result);
-      setDraft((current) => ({ ...current, imageUrl: result }));
-    };
+    reader.onload = () => setPreview(String(reader.result));
     reader.readAsDataURL(file);
   }
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onSubmit({
-      ...draft,
-      title: draft.title.trim(),
-      description: draft.description.trim(),
-      addedBy: draft.addedBy.trim() || 'Us',
-      imageUrl:
-        draft.imageUrl ||
-        'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1200&q=85',
-    });
+    setIsSubmitting(true);
+    await onSubmit(draft);
+    setIsSubmitting(false);
   }
 
   return (
@@ -331,92 +542,66 @@ function ContributorPanel({
           <X size={20} />
         </button>
 
-        {!unlocked ? (
-          <form
-            className="unlock"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (password.trim().length >= 3) setUnlocked(true);
-            }}
-          >
-            <Lock size={34} />
-            <h2>Private Memory Drop</h2>
-            <label>
-              <span>Secret phrase</span>
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="anything sweet works"
-                autoFocus
-              />
-            </label>
-            <button className="primary-button" type="submit">
-              <Sparkles size={18} />
-              Unlock
-            </button>
-          </form>
-        ) : (
-          <form className="memory-form" onSubmit={submit}>
-            <div className="panel-heading">
-              <Heart size={28} fill="currentColor" />
-              <div>
-                <h2>Add a Memory</h2>
-                <p>Saved instantly in this demo. Connect Firebase for shared live updates.</p>
-              </div>
+        <form className="memory-form" onSubmit={submit}>
+          <div className="panel-heading">
+            <Heart size={28} fill="currentColor" />
+            <div>
+              <h2>Add a Memory</h2>
+              <p>Uploads are saved to your shared Supabase timeline.</p>
             </div>
+          </div>
 
-            <label>
-              <span>Date</span>
-              <input
-                required
-                type="date"
-                value={draft.date}
-                onChange={(event) => setDraft({ ...draft, date: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>Milestone title</span>
-              <input
-                required
-                value={draft.title}
-                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                placeholder="Our first..."
-              />
-            </label>
-            <label>
-              <span>Description</span>
-              <textarea
-                required
-                value={draft.description}
-                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-                placeholder="Write the tiny detail you never want to lose."
-              />
-            </label>
-            <label>
-              <span>Added by</span>
-              <input
-                value={draft.addedBy}
-                onChange={(event) => setDraft({ ...draft, addedBy: event.target.value })}
-                placeholder="Your name"
-              />
-            </label>
-            <label className="upload-zone">
-              <input type="file" accept="image/*" onChange={(event) => handlePhoto(event.target.files?.[0])} />
-              {preview ? (
-                <img src={preview} alt="Selected memory preview" />
-              ) : (
-                <>
-                  <ImagePlus size={30} />
-                  <span>Drop in a photo</span>
-                </>
-              )}
-            </label>
-            <button className="primary-button" type="submit">
-              <Send size={18} />
-              Add memory
-            </button>
-          </form>
-        )}
+          <label>
+            <span>Date</span>
+            <input
+              required
+              type="date"
+              value={draft.date}
+              onChange={(event) => setDraft({ ...draft, date: event.target.value })}
+            />
+          </label>
+          <label>
+            <span>Milestone title</span>
+            <input
+              required
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              placeholder="Our first..."
+            />
+          </label>
+          <label>
+            <span>Description</span>
+            <textarea
+              required
+              value={draft.description}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              placeholder="Write the tiny detail you never want to lose."
+            />
+          </label>
+          <label>
+            <span>Added by</span>
+            <input
+              value={draft.addedBy}
+              onChange={(event) => setDraft({ ...draft, addedBy: event.target.value })}
+              placeholder="Your name"
+            />
+          </label>
+          <label className="upload-zone">
+            <input type="file" accept="image/*" onChange={(event) => handlePhoto(event.target.files?.[0])} />
+            {preview ? (
+              <img src={preview} alt="Selected memory preview" />
+            ) : (
+              <>
+                <UploadCloud size={30} />
+                <span>Choose a photo</span>
+              </>
+            )}
+          </label>
+          <button className="primary-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <LoaderCircle className="spin" size={18} /> : <Send size={18} />}
+            Add memory
+          </button>
+        </form>
       </motion.aside>
     </motion.div>
   );

@@ -157,6 +157,94 @@ h1 {
   overflow-x: clip;
 }
 
+.auth-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background:
+    linear-gradient(180deg, rgba(43, 24, 24, 0.08), rgba(255, 248, 242, 0.98)),
+    url("https://images.unsplash.com/photo-1494774157365-9e04c6720e47?auto=format&fit=crop&w=1800&q=86")
+      center / cover;
+}
+
+.auth-card {
+  display: grid;
+  gap: 16px;
+  width: min(430px, 100%);
+  padding: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 8px;
+  background: rgba(255, 250, 243, 0.92);
+  box-shadow: 0 34px 90px rgba(54, 28, 28, 0.28);
+  backdrop-filter: blur(18px);
+}
+
+.auth-mark {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: white;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--rose), var(--coral));
+  box-shadow: 0 16px 34px rgba(233, 81, 125, 0.28);
+}
+
+.auth-card h1 {
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: clamp(2.4rem, 8vw, 4.1rem);
+  line-height: 0.92;
+}
+
+.auth-eyebrow {
+  margin: 0;
+  color: #9a4260;
+  text-shadow: none;
+}
+
+.form-message {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #8c3150;
+  background: #ffe8ef;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.sign-out {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 999px;
+  color: white;
+  background: rgba(55, 34, 32, 0.34);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 34px rgba(49, 30, 28, 0.18);
+  cursor: pointer;
+}
+
+.status-pill {
+  width: min(720px, calc(100% - 32px));
+  margin: 8px auto 0;
+  padding: 11px 14px;
+  border: 1px solid #f1c9d6;
+  border-radius: 8px;
+  color: #8c3150;
+  background: #fff0f4;
+  font-weight: 800;
+  text-align: center;
+}
+
 .timeline-line {
   position: absolute;
   top: 0;
@@ -238,6 +326,27 @@ h1 {
   display: block;
   object-fit: cover;
   border-radius: 5px;
+}
+
+.delete-photo {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  color: white;
+  background: rgba(61, 35, 34, 0.66);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 26px rgba(44, 25, 24, 0.18);
+  cursor: pointer;
+}
+
+.delete-photo:hover {
+  background: var(--rose);
 }
 
 .tape {
@@ -460,6 +569,34 @@ textarea:focus {
   box-shadow: 0 14px 28px rgba(233, 81, 125, 0.22);
 }
 
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.empty-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: calc(50% + 30px);
+  padding: 14px 16px;
+  border-radius: 8px;
+  color: #8c3150;
+  background: #ffe8ef;
+  font-weight: 850;
+  box-shadow: 0 16px 36px rgba(82, 50, 38, 0.12);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
 .floating-hearts {
   position: fixed;
   right: 46px;
@@ -516,6 +653,10 @@ textarea:focus {
 
   .photo-frame {
     max-width: 360px;
+  }
+
+  .empty-state {
+    margin-left: 44px;
   }
 }
 
