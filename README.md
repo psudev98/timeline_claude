@@ -1,84 +1,94 @@
-<<<<<<< HEAD
 # Our Little Timeline
 
-A romantic, animated React timeline with a live anniversary counter, scroll-linked glowing timeline, spring-loaded memory cards, and a hidden contributor panel.
+A private shared space for two people, built with React, Framer Motion, Supabase, and Vercel.
 
-## Run locally
+## Included
 
-```bash
-npm install
-npm run dev
+- Supabase email/password login
+- Personal display names and profile colors
+- Realtime shared timeline and new-memory notifications
+- Multi-photo albums with carousel and individual photo removal
+- Reactions, replies, favorite memories, and mood tags
+- Voice notes and a song link per memory
+- Secret-phrase and scheduled memory unlocks
+- Locations and a map view
+- Calendar and draggable Polaroid wall views
+- Scheduled love letters
+- Monthly anniversary and custom countdowns
+- "This day again" resurfacing
+- Four visual themes
+- Special-date heart/sparkle celebrations
+- Mobile-first upload form
+- Print/PDF keepsake export
+
+## 1. Upgrade Supabase
+
+Open **Supabase > SQL Editor**, paste the complete contents of:
+
+```txt
+supabase-romance-upgrade.sql
 ```
 
-## Supabase setup
+Then click **Run**.
 
-The app uses Supabase Auth, Database, Storage, and Realtime.
+The migration is additive. It keeps existing milestones and adds the columns, tables, RLS policies, Storage rules, and Realtime publication entries used by the expanded app.
 
-Add these variables in Vercel and in `.env.local` for local development:
+Your existing private Storage bucket must be named:
+
+```txt
+photos
+```
+
+The bucket stores photos and voice-note files. Access remains limited to authenticated users through Storage RLS.
+
+## 2. Authentication
+
+In **Supabase > Authentication > Users**, create the two accounts that should access the site.
+
+Each person signs in with:
+
+```txt
+User ID: their Supabase Auth email
+Password: the password assigned to that Auth user
+```
+
+After signing in, each person can choose a display name and profile color from the settings button.
+
+## 3. Environment variables
+
+Add these in **Vercel > Project > Settings > Environment Variables**:
 
 ```bash
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Run this in the Supabase SQL Editor if your `milestones` table already exists:
+Use the anon/public key, never the Supabase service-role key.
 
-```sql
-alter table milestones
-add column if not exists photo_path text;
+For local development, put the same values in `.env.local`.
 
-alter table milestones enable row level security;
+## 4. Install and run
 
-drop policy if exists "Authenticated users can view milestones" on milestones;
-drop policy if exists "Authenticated users can add milestones" on milestones;
-drop policy if exists "Authenticated users can remove milestones" on milestones;
-
-create policy "Authenticated users can view milestones"
-on milestones
-for select
-to authenticated
-using (true);
-
-create policy "Authenticated users can add milestones"
-on milestones
-for insert
-to authenticated
-with check (true);
-
-create policy "Authenticated users can remove milestones"
-on milestones
-for delete
-to authenticated
-using (true);
+```bash
+npm install
+npm run dev
 ```
 
-Create a private Storage bucket named `photos`, then add Storage policies:
+Production build:
 
-```sql
-drop policy if exists "Authenticated users can upload photos" on storage.objects;
-drop policy if exists "Authenticated users can view photos" on storage.objects;
-drop policy if exists "Authenticated users can delete photos" on storage.objects;
-
-create policy "Authenticated users can upload photos"
-on storage.objects
-for insert
-to authenticated
-with check (bucket_id = 'photos');
-
-create policy "Authenticated users can view photos"
-on storage.objects
-for select
-to authenticated
-using (bucket_id = 'photos');
-
-create policy "Authenticated users can delete photos"
-on storage.objects
-for delete
-to authenticated
-using (bucket_id = 'photos');
+```bash
+npm run build
 ```
 
-Create two Supabase Auth users from Authentication > Users. The login screen labels the email as a User ID, so both of you can sign in with your email and password.
-=======
-# timeline
->>>>>>> 866f4007cddb5743aa0500671e653637cb2fd1c4
+## 5. Deploy updates
+
+Push this project to the GitHub repository connected to Vercel. Vercel will install the updated Supabase dependency, build the Vite app, and deploy it automatically.
+
+If automatic deployment is disabled, open **Vercel > Deployments** and redeploy the latest commit.
+
+## Notes
+
+- Music mode requires a direct browser-playable audio URL. Spotify/YouTube page links can still appear on a memory, but usually cannot play as background audio.
+- The map uses latitude and longitude saved with each memory.
+- The export button opens the browser print dialog. Choose **Save as PDF** for a keepsake.
+- Both authenticated users can currently edit the shared experience and remove memories/files. This matches a mutual-contributor setup.
