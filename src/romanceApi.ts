@@ -40,6 +40,13 @@ async function signedUrl(path: string | null) {
   return data?.signedUrl || '';
 }
 
+function isOptionalSetupError(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const data = error as { message?: string; code?: string };
+  const message = (data.message || '').toLowerCase();
+  return data.code === '42P01' || message.includes('does not exist') || message.includes('schema cache');
+}
+
 export function profileFromSession(session: Session): Profile {
   return {
     name:
@@ -63,7 +70,11 @@ export async function uploadMemoryFile(userId: string, file: File, folder: strin
   const { error } = await supabase.storage
     .from('photos')
     .upload(path, file, { cacheControl: '3600', upsert: false });
-  if (error) throw error;
+  if (error) {
+    throw new Error(
+      `Photo upload failed: ${error.message}. Check that the photos bucket exists and authenticated Storage insert/select policies are enabled.`,
+    );
+  }
   return path;
 }
 
@@ -86,16 +97,16 @@ export async function loadRomanceData() {
 
   const firstError = [
     milestonesResult.error,
-    mediaResult.error,
-    reactionsResult.error,
-    commentsResult.error,
-    lettersResult.error,
-    datesResult.error,
+    mediaResult.error && !isOptionalSetupError(mediaResult.error) ? mediaResult.error : null,
+    reactionsResult.error && !isOptionalSetupError(reactionsResult.error) ? reactionsResult.error : null,
+    commentsResult.error && !isOptionalSetupError(commentsResult.error) ? commentsResult.error : null,
+    lettersResult.error && !isOptionalSetupError(lettersResult.error) ? lettersResult.error : null,
+    datesResult.error && !isOptionalSetupError(datesResult.error) ? datesResult.error : null,
   ].find(Boolean);
   if (firstError) throw firstError;
 
   const media: MediaItem[] = await Promise.all(
-    (mediaResult.data || []).map(async (row) => ({
+    (!mediaResult.error ? mediaResult.data || [] : []).map(async (row) => ({
       id: row.id,
       milestoneId: row.milestone_id,
       storagePath: row.storage_path,
@@ -105,14 +116,14 @@ export async function loadRomanceData() {
     })),
   );
 
-  const reactions: Reaction[] = (reactionsResult.data || []).map((row) => ({
+  const reactions: Reaction[] = (!reactionsResult.error ? reactionsResult.data || [] : []).map((row) => ({
     id: row.id,
     milestoneId: row.milestone_id,
     userId: row.user_id,
     reaction: row.reaction,
   }));
 
-  const comments: Comment[] = (commentsResult.data || []).map((row) => ({
+  const comments: Comment[] = (!commentsResult.error ? commentsResult.data || [] : []).map((row) => ({
     id: row.id,
     milestoneId: row.milestone_id,
     userId: row.user_id,
@@ -135,7 +146,7 @@ export async function loadRomanceData() {
         imageUrl: rowMedia.find((item) => item.mediaType === 'image')?.signedUrl || legacyUrl,
         photoPath: row.photo_path,
         addedBy: row.added_by,
-        isFavorite: row.is_favorite,
+        isFavorite: row.is_favorite || false,
         moodTags: row.mood_tags || [],
         locationName: row.location_name || '',
         latitude: row.latitude,
@@ -152,7 +163,7 @@ export async function loadRomanceData() {
     }),
   );
 
-  const letters: LoveLetter[] = (lettersResult.data || []).map((row) => ({
+  const letters: LoveLetter[] = (!lettersResult.error ? lettersResult.data || [] : []).map((row) => ({
     id: row.id,
     title: row.title,
     body: row.body,
@@ -161,7 +172,7 @@ export async function loadRomanceData() {
     createdAt: row.created_at,
   }));
 
-  const specialDates: SpecialDate[] = (datesResult.data || []).map((row) => ({
+  const specialDates: SpecialDate[] = (!datesResult.error ? datesResult.data || [] : []).map((row) => ({
     id: row.id,
     title: row.title,
     eventDate: row.event_date,

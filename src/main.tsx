@@ -118,6 +118,32 @@ function elapsedParts(now: Date) {
   };
 }
 
+function readableError(error: unknown, fallback: string) {
+  if (!error) return fallback;
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object') {
+    const data = error as { message?: string; details?: string; hint?: string; code?: string };
+    return [data.message, data.details, data.hint, data.code && `Code: ${data.code}`]
+      .filter(Boolean)
+      .join(' ');
+  }
+  return fallback;
+}
+
+function shouldRetryBasicMilestone(error: unknown) {
+  const message = readableError(error, '').toLowerCase();
+  return (
+    message.includes('column') ||
+    message.includes('schema cache') ||
+    message.includes('mood_tags') ||
+    message.includes('voice_path') ||
+    message.includes('unlock_phrase') ||
+    message.includes('location_name') ||
+    message.includes('song_url')
+  );
+}
+
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -274,27 +300,46 @@ function RomanceApp({ session }: { session: Session }) {
         imageUrl = data.publicUrl;
       }
 
-      const { data, error } = await supabase
+      const richPayload = {
+        user_id: session.user.id,
+        date: draft.date,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        image_url: imageUrl,
+        photo_path: firstPath,
+        added_by: draft.addedBy.trim() || profile.name,
+        mood_tags: draft.moods,
+        location_name: draft.locationName.trim() || null,
+        latitude: draft.latitude ? Number(draft.latitude) : null,
+        longitude: draft.longitude ? Number(draft.longitude) : null,
+        song_url: draft.songUrl.trim() || null,
+        voice_path: voicePath,
+        unlock_phrase: draft.unlockPhrase.trim() || null,
+        unlock_at: draft.unlockAt ? new Date(draft.unlockAt).toISOString() : null,
+      };
+
+      let insertResult = await supabase
         .from('milestones')
-        .insert({
-          user_id: session.user.id,
-          date: draft.date,
-          title: draft.title.trim(),
-          description: draft.description.trim(),
-          image_url: imageUrl,
-          photo_path: firstPath,
-          added_by: draft.addedBy.trim() || profile.name,
-          mood_tags: draft.moods,
-          location_name: draft.locationName.trim() || null,
-          latitude: draft.latitude ? Number(draft.latitude) : null,
-          longitude: draft.longitude ? Number(draft.longitude) : null,
-          song_url: draft.songUrl.trim() || null,
-          voice_path: voicePath,
-          unlock_phrase: draft.unlockPhrase.trim() || null,
-          unlock_at: draft.unlockAt ? new Date(draft.unlockAt).toISOString() : null,
-        })
+        .insert(richPayload)
         .select('id')
         .single();
+
+      if (insertResult.error && shouldRetryBasicMilestone(insertResult.error)) {
+        insertResult = await supabase
+          .from('milestones')
+          .insert({
+            date: richPayload.date,
+            title: richPayload.title,
+            description: richPayload.description,
+            image_url: richPayload.image_url,
+            photo_path: richPayload.photo_path,
+            added_by: richPayload.added_by,
+          })
+          .select('id')
+          .single();
+      }
+
+      const { data, error } = insertResult;
       if (error) throw error;
 
       if (photoPaths.length) {
@@ -306,7 +351,14 @@ function RomanceApp({ session }: { session: Session }) {
             sort_order: index,
           })),
         );
-        if (mediaError) throw mediaError;
+        if (mediaError) {
+          setStatus(
+            `Memory saved, but the album table is not ready yet: ${readableError(
+              mediaError,
+              'Run supabase-romance-upgrade.sql.',
+            )}`,
+          );
+        }
       }
 
       setAddOpen(false);
@@ -314,7 +366,7 @@ function RomanceApp({ session }: { session: Session }) {
       setToast('Memory added to your story');
       await refresh(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not add memory.');
+      setStatus(readableError(error, 'Could not add memory.'));
     }
   }
 
@@ -339,7 +391,7 @@ function RomanceApp({ session }: { session: Session }) {
       setToast('Memory removed');
       setStatus('');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not remove memory.');
+      setStatus(readableError(error, 'Could not remove memory.'));
     }
   }
 
@@ -363,7 +415,7 @@ function RomanceApp({ session }: { session: Session }) {
       setToast('Photo removed from the album');
       await refresh(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not remove photo.');
+      setStatus(readableError(error, 'Could not remove photo.'));
     }
   }
 
@@ -384,7 +436,7 @@ function RomanceApp({ session }: { session: Session }) {
       await toggleReaction(item.id, session.user.id, kind, active);
       await refresh(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not save reaction.');
+      setStatus(readableError(error, 'Could not save reaction.'));
     }
   }
 
@@ -393,7 +445,7 @@ function RomanceApp({ session }: { session: Session }) {
       await addComment(item.id, session.user.id, profile, body);
       await refresh(true);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not add reply.');
+      setStatus(readableError(error, 'Could not add reply.'));
     }
   }
 
@@ -404,7 +456,7 @@ function RomanceApp({ session }: { session: Session }) {
       setSettingsOpen(false);
       setToast('Your profile has a new glow');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not update profile.');
+      setStatus(readableError(error, 'Could not update profile.'));
     }
   }
 
@@ -670,9 +722,14 @@ function TimelineView({
   onComment: (item: Milestone, body: string) => void;
 }) {
   return (
-    <section className="timeline-section" ref={timelineRef}>
-      <div className="timeline-line">
-        <motion.div className="timeline-line-fill" style={{ height: lineHeight }} />
+    <section className="scrapbook-section" ref={timelineRef}>
+      <div className="scrapbook-progress">
+        <motion.div style={{ height: lineHeight }} />
+      </div>
+      <div className="scrapbook-intro">
+        <span className="section-kicker">Scrapbook flip</span>
+        <h2>Pages from us</h2>
+        <p>Scroll slowly. Each spread opens like a tucked-away memory.</p>
       </div>
       {items.length ? (
         items.map((item, index) => (
@@ -689,7 +746,13 @@ function TimelineView({
           />
         ))
       ) : (
-        <EmptyState text="Add your first shared memory." />
+        <div className="empty-scrapbook">
+          <div className="empty-envelope">
+            <Heart size={28} fill="currentColor" />
+            <strong>Add your first shared memory.</strong>
+            <span>The first page is waiting.</span>
+          </div>
+        </div>
       )}
     </section>
   );
@@ -730,87 +793,151 @@ function TimelineCard({
 
   return (
     <motion.article
-      className={`timeline-card ${isEven ? 'left' : 'right'}`}
-      initial={{ opacity: 0, x: isEven ? -70 : 70, y: 18, scale: 0.92 }}
-      whileInView={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-      viewport={{ amount: 0.2, once: false }}
-      transition={{ type: 'spring', stiffness: 100, damping: 14 }}
+      className={`scrapbook-spread ${isEven ? 'flip-left' : 'flip-right'}`}
+      initial={{ opacity: 0, y: 90, rotateX: 8 }}
+      whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+      viewport={{ amount: 0.34, once: false }}
+      transition={{ type: 'spring', stiffness: 78, damping: 16, mass: 0.86 }}
     >
-      <div className="node" aria-hidden="true">
-        <Heart size={15} fill="currentColor" />
-      </div>
-      <motion.div className="photo-frame" whileHover={{ scale: 1.025, rotate: 0 }}>
-        {hidden ? (
-          <div className="secret-memory">
-            <Lock size={30} />
-            <strong>{timeLocked ? 'A future memory' : 'A tiny secret'}</strong>
-            {timeLocked ? (
-              <span>Opens {format(new Date(item.unlockAt!), 'MMM d, yyyy')}</span>
-            ) : (
-              <div className="secret-input">
-                <input
-                  value={phrase}
-                  onChange={(event) => setPhrase(event.target.value)}
-                  placeholder="Secret phrase"
-                />
-                <button onClick={tryUnlock} aria-label="Unlock memory">
-                  <Unlock size={17} />
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <img src={gallery[slide]} alt={item.title} loading="lazy" />
-            {gallery.length > 1 && (
-              <div className="carousel-controls">
-                <button
-                  onClick={() => setSlide((value) => (value - 1 + gallery.length) % gallery.length)}
-                  aria-label="Previous photo"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <span>{slide + 1} / {gallery.length}</span>
-                <button
-                  onClick={() => setSlide((value) => (value + 1) % gallery.length)}
-                  aria-label="Next photo"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            )}
-            {currentMedia && (
-              <button
-                className="remove-slide"
-                onClick={() => onDeletePhoto(currentMedia.id, currentMedia.storagePath)}
-                aria-label="Remove current photo"
-              >
-                <X size={15} />
-              </button>
-            )}
-          </>
-        )}
-        <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
-          <Trash2 size={18} />
-        </button>
-        <button
-          className={`favorite-photo ${item.isFavorite ? 'active' : ''}`}
-          onClick={onFavorite}
-          aria-label="Pin favorite"
-        >
-          <Star size={18} fill={item.isFavorite ? 'currentColor' : 'none'} />
-        </button>
-        <div className="tape tape-a" />
-        <div className="tape tape-b" />
+      <div className="spread-shadow" aria-hidden="true" />
+      <div className="book-gutter" aria-hidden="true" />
+      <div className="sketch-heart sketch-heart-a" aria-hidden="true">♡</div>
+      <motion.div
+        className="scrap-ticket"
+        aria-hidden="true"
+        initial={{ x: isEven ? -60 : 60, opacity: 0, rotate: isEven ? -12 : 12 }}
+        whileInView={{ x: 0, opacity: 1, rotate: isEven ? -5 : 5 }}
+        viewport={{ amount: 0.45, once: false }}
+        transition={{ type: 'spring', stiffness: 85, damping: 15, delay: 0.1 }}
+      >
+        keepsake
       </motion.div>
 
-      <div className="card-copy">
-        <span className="date-badge">
+      <motion.div
+        className="scrapbook-page photo-page"
+        initial={{
+          rotateY: isEven ? -68 : 68,
+          x: isEven ? -34 : 34,
+          opacity: 0.2,
+        }}
+        whileInView={{ rotateY: 0, x: 0, opacity: 1 }}
+        viewport={{ amount: 0.44, once: false }}
+        transition={{ type: 'spring', stiffness: 76, damping: 15, mass: 0.9 }}
+      >
+        <div className="paper-fiber" aria-hidden="true" />
+        <motion.div
+          className="tape-strip tape-top"
+          aria-hidden="true"
+          initial={{ y: -28, opacity: 0, rotate: -9 }}
+          whileInView={{ y: 0, opacity: 1, rotate: -5 }}
+          viewport={{ amount: 0.5, once: false }}
+          transition={{ delay: 0.12 }}
+        />
+        <motion.div
+          className="tape-strip tape-side"
+          aria-hidden="true"
+          initial={{ x: 35, opacity: 0, rotate: 16 }}
+          whileInView={{ x: 0, opacity: 1, rotate: 10 }}
+          viewport={{ amount: 0.5, once: false }}
+          transition={{ delay: 0.18 }}
+        />
+        <div className="photo-frame scrapbook-photo">
+          {hidden ? (
+            <div className="secret-memory">
+              <Lock size={30} />
+              <strong>{timeLocked ? 'A future memory' : 'A tiny secret'}</strong>
+              {timeLocked ? (
+                <span>Opens {format(new Date(item.unlockAt!), 'MMM d, yyyy')}</span>
+              ) : (
+                <div className="secret-input">
+                  <input
+                    value={phrase}
+                    onChange={(event) => setPhrase(event.target.value)}
+                    placeholder="Secret phrase"
+                  />
+                  <button onClick={tryUnlock} aria-label="Unlock memory">
+                    <Unlock size={17} />
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <img src={gallery[slide]} alt={item.title} loading="lazy" />
+              {gallery.length > 1 && (
+                <div className="carousel-controls">
+                  <button
+                    onClick={() => setSlide((value) => (value - 1 + gallery.length) % gallery.length)}
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span>{slide + 1} / {gallery.length}</span>
+                  <button
+                    onClick={() => setSlide((value) => (value + 1) % gallery.length)}
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              )}
+              {currentMedia && (
+                <button
+                  className="remove-slide"
+                  onClick={() => onDeletePhoto(currentMedia.id, currentMedia.storagePath)}
+                  aria-label="Remove current photo"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </>
+          )}
+          <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
+            <Trash2 size={18} />
+          </button>
+          <button
+            className={`favorite-photo ${item.isFavorite ? 'active' : ''}`}
+            onClick={onFavorite}
+            aria-label="Pin favorite"
+          >
+            <Star size={18} fill={item.isFavorite ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+      </div>
+
+      <motion.div
+        className="scrapbook-page note-page"
+        initial={{
+          rotateY: isEven ? 58 : -58,
+          x: isEven ? 34 : -34,
+          opacity: 0.35,
+        }}
+        whileInView={{ rotateY: 0, x: 0, opacity: 1 }}
+        viewport={{ amount: 0.44, once: false }}
+        transition={{ type: 'spring', stiffness: 70, damping: 16, delay: 0.06 }}
+      >
+        <div className="paper-fiber" aria-hidden="true" />
+        <motion.div
+          className="handwritten-date"
+          initial={{ y: -18, opacity: 0 }}
+          whileInView={{ y: 0, opacity: 1 }}
+          viewport={{ amount: 0.5, once: false }}
+          transition={{ delay: 0.16 }}
+        >
           <CalendarHeart size={16} />
           {format(parseISO(item.date), 'MMM d, yyyy')}
-        </span>
-        <h2>{item.title}</h2>
-        <p>{item.description}</p>
+        </motion.div>
+        <motion.div
+          className="note-card"
+          initial={{ y: 44, opacity: 0, rotate: isEven ? 2 : -2 }}
+          whileInView={{ y: 0, opacity: 1, rotate: isEven ? -1 : 1 }}
+          viewport={{ amount: 0.45, once: false }}
+          transition={{ type: 'spring', stiffness: 82, damping: 14, delay: 0.18 }}
+        >
+          <span className="ink-label">memory no. {String(Math.abs(item.id.length * 7) % 99).padStart(2, '0')}</span>
+          <h2>{item.title}</h2>
+          <p>{item.description}</p>
+        </motion.div>
         {item.moodTags.length > 0 && (
           <div className="mood-row">
             {item.moodTags.map((tag) => <span key={tag}>{tag}</span>)}
@@ -884,7 +1011,7 @@ function TimelineCard({
             </button>
           </form>
         </div>
-      </div>
+      </motion.div>
     </motion.article>
   );
 }

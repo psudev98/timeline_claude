@@ -20,6 +20,7 @@ A private shared space for two people, built with React, Framer Motion, Supabase
 - Special-date heart/sparkle celebrations
 - Mobile-first upload form
 - Print/PDF keepsake export
+- Scrapbook Flip UI with 3D page spreads, paper texture, tape, ticket stubs, envelope/secret reveals, and parallax-style decorative motion
 
 ## 1. Upgrade Supabase
 
@@ -40,6 +41,15 @@ photos
 ```
 
 The bucket stores photos and voice-note files. Access remains limited to authenticated users through Storage RLS.
+
+If the site says it cannot add a memory, check the message shown in the pink status box. The most common causes are:
+
+- `photos` bucket does not exist.
+- Storage policies for authenticated upload/read/delete were not created.
+- `supabase-romance-upgrade.sql` was not run after the new scrapbook features were added.
+- Vercel was not redeployed after pushing the latest code.
+
+The app can now fall back to a basic milestone insert if the optional scrapbook columns are not present, but photo albums, reactions, comments, letters, and other interactions need the upgrade SQL.
 
 ## 2. Authentication
 
