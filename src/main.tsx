@@ -801,7 +801,7 @@ function TimelineCard({
     >
       <div className="spread-shadow" aria-hidden="true" />
       <div className="book-gutter" aria-hidden="true" />
-      <div className="sketch-heart sketch-heart-a" aria-hidden="true">♡</div>
+      <div className="sketch-heart sketch-heart-a" aria-hidden="true">heart</div>
       <motion.div
         className="scrap-ticket"
         aria-hidden="true"
@@ -903,7 +903,7 @@ function TimelineCard({
             <Star size={18} fill={item.isFavorite ? 'currentColor' : 'none'} />
           </button>
         </div>
-      </div>
+      </motion.div>
 
       <motion.div
         className="scrapbook-page note-page"
