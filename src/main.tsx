@@ -616,6 +616,7 @@ function RomanceApp({ session }: { session: Session }) {
               items={sorted}
               session={session}
               lineHeight={lineHeight}
+              lineProgress={progress}
               timelineRef={timelineRef}
               onDelete={deleteMemory}
               onDeletePhoto={deletePhoto}
@@ -704,6 +705,7 @@ function TimelineView({
   items,
   session,
   lineHeight,
+  lineProgress,
   timelineRef,
   onDelete,
   onDeletePhoto,
@@ -714,6 +716,7 @@ function TimelineView({
   items: Milestone[];
   session: Session;
   lineHeight: MotionValue<string>;
+  lineProgress: MotionValue<number>;
   timelineRef: React.RefObject<HTMLDivElement | null>;
   onDelete: (item: Milestone) => void;
   onDeletePhoto: (item: Milestone, mediaId: string, storagePath: string) => void;
@@ -721,15 +724,30 @@ function TimelineView({
   onReact: (item: Milestone, kind: ReactionKind) => void;
   onComment: (item: Milestone, body: string) => void;
 }) {
+  const [selected, setSelected] = useState<Milestone | null>(null);
+
   return (
-    <section className="scrapbook-section" ref={timelineRef}>
-      <div className="scrapbook-progress">
-        <motion.div style={{ height: lineHeight }} />
+    <section className="polaroid-timeline-section" ref={timelineRef}>
+      <div className="twine-track" aria-hidden="true">
+        <svg viewBox="0 0 24 1200" preserveAspectRatio="none">
+          <line className="twine-base" x1="12" y1="0" x2="12" y2="1200" />
+          <motion.line
+            className="twine-draw"
+            x1="12"
+            y1="0"
+            x2="12"
+            y2="1200"
+            style={{ pathLength: lineProgress }}
+          />
+        </svg>
+        <motion.div className="heart-progress" style={{ top: lineHeight }}>
+          <Heart size={18} fill="currentColor" />
+        </motion.div>
       </div>
-      <div className="scrapbook-intro">
-        <span className="section-kicker">Scrapbook flip</span>
-        <h2>Pages from us</h2>
-        <p>Scroll slowly. Each spread opens like a tucked-away memory.</p>
+      <div className="polaroid-intro">
+        <span className="section-kicker">Pinned to the string</span>
+        <h2>Couple Memories Timeline</h2>
+        <p>Scroll down and each Polaroid drops into place like it was clipped there by hand.</p>
       </div>
       {items.length ? (
         items.map((item, index) => (
@@ -743,17 +761,26 @@ function TimelineView({
             onFavorite={() => onFavorite(item)}
             onReact={(kind) => onReact(item, kind)}
             onComment={(body) => onComment(item, body)}
+            onOpen={() => setSelected(item)}
           />
         ))
       ) : (
-        <div className="empty-scrapbook">
-          <div className="empty-envelope">
+        <div className="empty-polaroid-line">
+          <div className="empty-polaroid">
             <Heart size={28} fill="currentColor" />
             <strong>Add your first shared memory.</strong>
-            <span>The first page is waiting.</span>
+            <span>The string is waiting for its first photo.</span>
           </div>
         </div>
       )}
+      <AnimatePresence>
+        {selected && (
+          <MemoryLightbox
+            item={selected}
+            onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -767,6 +794,7 @@ function TimelineCard({
   onFavorite,
   onReact,
   onComment,
+  onOpen,
 }: {
   item: Milestone;
   isEven: boolean;
@@ -776,6 +804,7 @@ function TimelineCard({
   onFavorite: () => void;
   onReact: (kind: ReactionKind) => void;
   onComment: (body: string) => void;
+  onOpen: () => void;
 }) {
   const [slide, setSlide] = useState(0);
   const [reply, setReply] = useState('');
@@ -791,57 +820,46 @@ function TimelineCard({
     if (phrase.trim().toLowerCase() === item.unlockPhrase.toLowerCase()) setUnlocked(true);
   }
 
+  const restRotation = isEven ? -3 : 4;
+
   return (
     <motion.article
-      className={`scrapbook-spread ${isEven ? 'flip-left' : 'flip-right'}`}
-      initial={{ opacity: 0, y: 90, rotateX: 8 }}
-      whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-      viewport={{ amount: 0.34, once: false }}
-      transition={{ type: 'spring', stiffness: 78, damping: 16, mass: 0.86 }}
+      className={`pinned-memory ${isEven ? 'memory-left' : 'memory-right'}`}
+      initial={{ opacity: 0, y: -80, rotate: isEven ? -8 : 8, scale: 0.92 }}
+      whileInView={{ opacity: 1, y: 0, rotate: restRotation, scale: 1 }}
+      viewport={{ amount: 0.36, once: false }}
+      transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52 }}
     >
-      <div className="spread-shadow" aria-hidden="true" />
-      <div className="book-gutter" aria-hidden="true" />
-      <div className="sketch-heart sketch-heart-a" aria-hidden="true">heart</div>
       <motion.div
-        className="scrap-ticket"
-        aria-hidden="true"
-        initial={{ x: isEven ? -60 : 60, opacity: 0, rotate: isEven ? -12 : 12 }}
-        whileInView={{ x: 0, opacity: 1, rotate: isEven ? -5 : 5 }}
-        viewport={{ amount: 0.45, once: false }}
-        transition={{ type: 'spring', stiffness: 85, damping: 15, delay: 0.1 }}
+        className="peg"
+        initial={{ scale: 0.75, y: -8, opacity: 0 }}
+        whileInView={{ scale: [0.8, 1.16, 1], y: 0, opacity: 1 }}
+        viewport={{ amount: 0.4, once: false }}
+        transition={{ duration: 0.38, delay: 0.16 }}
       >
-        keepsake
+        <span />
       </motion.div>
+      <div className="string-connector" aria-hidden="true" />
 
       <motion.div
-        className="scrapbook-page photo-page"
-        initial={{
-          rotateY: isEven ? -68 : 68,
-          x: isEven ? -34 : 34,
-          opacity: 0.2,
-        }}
-        whileInView={{ rotateY: 0, x: 0, opacity: 1 }}
-        viewport={{ amount: 0.44, once: false }}
-        transition={{ type: 'spring', stiffness: 76, damping: 15, mass: 0.9 }}
+        className="polaroid-card"
+        layoutId={`memory-card-${item.id}`}
+        whileHover={{ scale: 1.03, rotate: restRotation * 0.65, y: -4 }}
+        onClick={onOpen}
       >
-        <div className="paper-fiber" aria-hidden="true" />
-        <motion.div
-          className="tape-strip tape-top"
-          aria-hidden="true"
-          initial={{ y: -28, opacity: 0, rotate: -9 }}
-          whileInView={{ y: 0, opacity: 1, rotate: -5 }}
-          viewport={{ amount: 0.5, once: false }}
-          transition={{ delay: 0.12 }}
-        />
-        <motion.div
-          className="tape-strip tape-side"
-          aria-hidden="true"
-          initial={{ x: 35, opacity: 0, rotate: 16 }}
-          whileInView={{ x: 0, opacity: 1, rotate: 10 }}
-          viewport={{ amount: 0.5, once: false }}
-          transition={{ delay: 0.18 }}
-        />
-        <div className="photo-frame scrapbook-photo">
+        <div className="polaroid-actions" onClick={(event) => event.stopPropagation()}>
+          <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
+            <Trash2 size={17} />
+          </button>
+          <button
+            className={`favorite-photo ${item.isFavorite ? 'active' : ''}`}
+            onClick={onFavorite}
+            aria-label="Pin favorite"
+          >
+            <Star size={17} fill={item.isFavorite ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+        <div className="polaroid-image">
           {hidden ? (
             <div className="secret-memory">
               <Lock size={30} />
@@ -849,7 +867,7 @@ function TimelineCard({
               {timeLocked ? (
                 <span>Opens {format(new Date(item.unlockAt!), 'MMM d, yyyy')}</span>
               ) : (
-                <div className="secret-input">
+                <div className="secret-input" onClick={(event) => event.stopPropagation()}>
                   <input
                     value={phrase}
                     onChange={(event) => setPhrase(event.target.value)}
@@ -862,82 +880,46 @@ function TimelineCard({
               )}
             </div>
           ) : (
-            <>
-              <img src={gallery[slide]} alt={item.title} loading="lazy" />
-              {gallery.length > 1 && (
-                <div className="carousel-controls">
-                  <button
-                    onClick={() => setSlide((value) => (value - 1 + gallery.length) % gallery.length)}
-                    aria-label="Previous photo"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                  <span>{slide + 1} / {gallery.length}</span>
-                  <button
-                    onClick={() => setSlide((value) => (value + 1) % gallery.length)}
-                    aria-label="Next photo"
-                  >
-                    <ChevronRight size={18} />
-                  </button>
-                </div>
-              )}
-              {currentMedia && (
-                <button
-                  className="remove-slide"
-                  onClick={() => onDeletePhoto(currentMedia.id, currentMedia.storagePath)}
-                  aria-label="Remove current photo"
-                >
-                  <X size={15} />
-                </button>
-              )}
-            </>
+            <img src={gallery[slide]} alt={item.title} loading="lazy" />
           )}
-          <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
-            <Trash2 size={18} />
-          </button>
-          <button
-            className={`favorite-photo ${item.isFavorite ? 'active' : ''}`}
-            onClick={onFavorite}
-            aria-label="Pin favorite"
-          >
-            <Star size={18} fill={item.isFavorite ? 'currentColor' : 'none'} />
-          </button>
+          {!hidden && gallery.length > 1 && (
+            <div className="carousel-controls" onClick={(event) => event.stopPropagation()}>
+              <button
+                onClick={() => setSlide((value) => (value - 1 + gallery.length) % gallery.length)}
+                aria-label="Previous photo"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <span>{slide + 1} / {gallery.length}</span>
+              <button
+                onClick={() => setSlide((value) => (value + 1) % gallery.length)}
+                aria-label="Next photo"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
+          {!hidden && currentMedia && (
+            <button
+              className="remove-slide"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDeletePhoto(currentMedia.id, currentMedia.storagePath);
+              }}
+              aria-label="Remove current photo"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+        <div className="polaroid-caption">
+          <span>{format(parseISO(item.date), 'MMM d, yyyy')}</span>
+          <strong>{item.title}</strong>
         </div>
       </motion.div>
 
-      <motion.div
-        className="scrapbook-page note-page"
-        initial={{
-          rotateY: isEven ? 58 : -58,
-          x: isEven ? 34 : -34,
-          opacity: 0.35,
-        }}
-        whileInView={{ rotateY: 0, x: 0, opacity: 1 }}
-        viewport={{ amount: 0.44, once: false }}
-        transition={{ type: 'spring', stiffness: 70, damping: 16, delay: 0.06 }}
-      >
-        <div className="paper-fiber" aria-hidden="true" />
-        <motion.div
-          className="handwritten-date"
-          initial={{ y: -18, opacity: 0 }}
-          whileInView={{ y: 0, opacity: 1 }}
-          viewport={{ amount: 0.5, once: false }}
-          transition={{ delay: 0.16 }}
-        >
-          <CalendarHeart size={16} />
-          {format(parseISO(item.date), 'MMM d, yyyy')}
-        </motion.div>
-        <motion.div
-          className="note-card"
-          initial={{ y: 44, opacity: 0, rotate: isEven ? 2 : -2 }}
-          whileInView={{ y: 0, opacity: 1, rotate: isEven ? -1 : 1 }}
-          viewport={{ amount: 0.45, once: false }}
-          transition={{ type: 'spring', stiffness: 82, damping: 14, delay: 0.18 }}
-        >
-          <span className="ink-label">memory no. {String(Math.abs(item.id.length * 7) % 99).padStart(2, '0')}</span>
-          <h2>{item.title}</h2>
-          <p>{item.description}</p>
-        </motion.div>
+      <div className="memory-details">
+        <p>{item.description}</p>
         {item.moodTags.length > 0 && (
           <div className="mood-row">
             {item.moodTags.map((tag) => <span key={tag}>{tag}</span>)}
@@ -1011,8 +993,49 @@ function TimelineCard({
             </button>
           </form>
         </div>
-      </motion.div>
+      </div>
     </motion.article>
+  );
+}
+
+function MemoryLightbox({ item, onClose }: { item: Milestone; onClose: () => void }) {
+  const image = item.media.find((media) => media.mediaType === 'image')?.signedUrl || item.imageUrl;
+
+  return (
+    <motion.div
+      className="lightbox-backdrop"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.article
+        className="lightbox-polaroid"
+        layoutId={`memory-card-${item.id}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button className="lightbox-close" onClick={onClose} aria-label="Close memory">
+          <X size={22} />
+        </button>
+        <img src={image} alt={item.title} />
+        <div className="lightbox-copy">
+          <span>{format(parseISO(item.date), 'MMMM d, yyyy')}</span>
+          <h2>{item.title}</h2>
+          <p>{item.description}</p>
+          {item.moodTags.length > 0 && (
+            <div className="mood-row">
+              {item.moodTags.map((tag) => <span key={tag}>{tag}</span>)}
+            </div>
+          )}
+          {item.locationName && (
+            <span className="location-line">
+              <MapPin size={15} />
+              {item.locationName}
+            </span>
+          )}
+        </div>
+      </motion.article>
+    </motion.div>
   );
 }
 
