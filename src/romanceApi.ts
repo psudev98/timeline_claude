@@ -44,7 +44,19 @@ function isOptionalSetupError(error: unknown) {
   if (!error || typeof error !== 'object') return false;
   const data = error as { message?: string; code?: string };
   const message = (data.message || '').toLowerCase();
-  return data.code === '42P01' || message.includes('does not exist') || message.includes('schema cache');
+  return (
+    data.code === '42P01' ||
+    data.code === 'PGRST205' ||
+    message.includes('does not exist') ||
+    message.includes('schema cache') ||
+    message.includes('could not find the table')
+  );
+}
+
+function setupError(feature: string) {
+  return new Error(
+    `${feature} are not set up in Supabase yet. Run supabase-romance-upgrade.sql in Supabase SQL Editor, then reload the deployed site.`,
+  );
 }
 
 export function profileFromSession(session: Session): Profile {
@@ -196,6 +208,7 @@ export async function toggleReaction(
       .eq('milestone_id', milestoneId)
       .eq('user_id', userId)
       .eq('reaction', reaction);
+    if (isOptionalSetupError(error)) throw setupError('Reactions');
     if (error) throw error;
     return;
   }
@@ -203,6 +216,7 @@ export async function toggleReaction(
   const { error } = await supabase
     .from('reactions')
     .insert({ milestone_id: milestoneId, user_id: userId, reaction });
+  if (isOptionalSetupError(error)) throw setupError('Reactions');
   if (error) throw error;
 }
 
@@ -219,5 +233,6 @@ export async function addComment(
     author_color: profile.color,
     body: body.trim(),
   });
+  if (isOptionalSetupError(error)) throw setupError('Comments');
   if (error) throw error;
 }

@@ -48,6 +48,7 @@ If the site says it cannot add a memory, check the message shown in the pink sta
 - Storage policies for authenticated upload/read/delete were not created.
 - `supabase-romance-upgrade.sql` was not run after the new scrapbook features were added.
 - Vercel was not redeployed after pushing the latest code.
+- Reactions/comments fail with `PGRST205` because Supabase cannot find the `public.reactions` or `public.comments` table. Run the upgrade SQL and refresh the page.
 
 The app can now fall back to a basic milestone insert if the optional scrapbook columns are not present, but photo albums, reactions, comments, letters, and other interactions need the upgrade SQL.
 

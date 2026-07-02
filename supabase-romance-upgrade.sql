@@ -14,7 +14,7 @@ alter table public.milestones
 
 create table if not exists public.milestone_media (
   id uuid primary key default gen_random_uuid(),
-  milestone_id uuid not null references public.milestones(id) on delete cascade,
+  milestone_id bigint not null references public.milestones(id) on delete cascade,
   storage_path text not null,
   media_type text not null default 'image' check (media_type in ('image', 'audio')),
   sort_order integer not null default 0,
@@ -23,7 +23,7 @@ create table if not exists public.milestone_media (
 
 create table if not exists public.reactions (
   id uuid primary key default gen_random_uuid(),
-  milestone_id uuid not null references public.milestones(id) on delete cascade,
+  milestone_id bigint not null references public.milestones(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   reaction text not null check (reaction in ('heart', 'sparkle', 'smile', 'favorite')),
   created_at timestamptz not null default now(),
@@ -32,7 +32,7 @@ create table if not exists public.reactions (
 
 create table if not exists public.comments (
   id uuid primary key default gen_random_uuid(),
-  milestone_id uuid not null references public.milestones(id) on delete cascade,
+  milestone_id bigint not null references public.milestones(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
   author_name text not null,
   author_color text not null default '#e9517d',
