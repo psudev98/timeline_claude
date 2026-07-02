@@ -2450,6 +2450,434 @@ select {
   text-align: center;
 }
 
+.twine-track {
+  --sway-amp: 0.6deg;
+  animation: stringSway 3.5s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.twine-track.sway-boost {
+  --sway-amp: 1.4deg;
+}
+
+.twine-track.string-ripple {
+  animation:
+    stringRipple 400ms ease-out,
+    stringSway 3.5s ease-in-out infinite;
+}
+
+@keyframes stringSway {
+  0%,
+  100% {
+    transform: translateX(-50%) skewX(0deg);
+  }
+  25% {
+    transform: translateX(-50%) skewX(var(--sway-amp));
+  }
+  75% {
+    transform: translateX(-50%) skewX(calc(var(--sway-amp) * -1));
+  }
+}
+
+@keyframes stringRipple {
+  0% {
+    transform: translateX(-50%) skewX(-2deg);
+  }
+  100% {
+    transform: translateX(-50%) skewX(0deg);
+  }
+}
+
+.pinned-memory {
+  transition:
+    filter 200ms ease,
+    transform 300ms ease,
+    opacity 300ms ease;
+}
+
+.pinned-memory .polaroid-card {
+  --tilt-x: 0deg;
+  --tilt-y: 0deg;
+  box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  transform-style: preserve-3d;
+  transition:
+    box-shadow 300ms ease 80ms,
+    filter 200ms ease,
+    transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pinned-memory.has-landed .polaroid-card {
+  box-shadow: 0 18px 42px rgba(70, 45, 36, 0.19);
+}
+
+.pinned-memory.is-active .polaroid-card {
+  filter: brightness(1.06);
+  box-shadow: 0 24px 56px rgba(70, 45, 36, 0.26);
+}
+
+.pinned-memory:not(.is-active) .polaroid-card {
+  filter: brightness(0.92);
+}
+
+.pinned-memory.is-passed .polaroid-card {
+  filter: brightness(0.88);
+}
+
+.pinned-memory.is-passed.memory-left {
+  transform: translateX(-5px) rotate(-2deg);
+}
+
+.pinned-memory.is-passed.memory-right {
+  transform: translateX(5px) rotate(2deg);
+}
+
+.pinned-memory.is-exiting {
+  pointer-events: none;
+  animation: cardDeleteExit 450ms ease forwards;
+}
+
+@keyframes cardDeleteExit {
+  to {
+    opacity: 0;
+    transform: translateX(160px) rotate(18deg);
+  }
+}
+
+.polaroid-card:hover {
+  box-shadow: 0 28px 68px rgba(70, 45, 36, 0.27);
+}
+
+.polaroid-card:hover .polaroid-image {
+  transform: perspective(900px) rotateX(var(--tilt-x)) rotateY(var(--tilt-y));
+}
+
+.polaroid-image {
+  transition: transform 120ms ease-out;
+  transform-style: preserve-3d;
+}
+
+.pinned-memory .peg {
+  filter: brightness(1);
+}
+
+.pinned-memory.has-landed .peg {
+  animation: clipSnap 200ms cubic-bezier(0.34, 1.56, 0.64, 1) 60ms both;
+}
+
+@keyframes clipSnap {
+  0% {
+    transform: scale(0.7);
+    filter: brightness(1.5);
+  }
+  65% {
+    transform: scale(1.2);
+    filter: brightness(1.12);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+.polaroid-caption,
+.added-by,
+.reaction-row,
+.reply-form {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.pinned-memory.has-landed .polaroid-caption {
+  animation: detailReveal 260ms ease 280ms forwards;
+}
+
+.pinned-memory.has-landed .added-by {
+  animation: detailReveal 260ms ease 380ms forwards;
+}
+
+.pinned-memory.has-landed .reaction-row {
+  animation: detailReveal 220ms ease 440ms forwards;
+}
+
+.pinned-memory.has-landed .reply-form {
+  animation: replyReveal 260ms ease 905ms forwards;
+}
+
+@keyframes detailReveal {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes replyReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reaction-row button {
+  position: relative;
+  transform: scale(0);
+}
+
+.pinned-memory.has-landed .reaction-row button {
+  animation: reactionPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.pinned-memory.has-landed .reaction-row button:nth-child(1) { animation-delay: 600ms; }
+.pinned-memory.has-landed .reaction-row button:nth-child(2) { animation-delay: 655ms; }
+.pinned-memory.has-landed .reaction-row button:nth-child(3) { animation-delay: 710ms; }
+.pinned-memory.has-landed .reaction-row button:nth-child(4) { animation-delay: 765ms; }
+
+@keyframes reactionPop {
+  0% {
+    transform: scale(0);
+  }
+  70% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.polaroid-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.polaroid-card:hover .polaroid-actions,
+.polaroid-card:focus-within .polaroid-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.polaroid-actions .delete-photo,
+.polaroid-actions .favorite-photo {
+  opacity: 0;
+  transform: translateY(-10px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.polaroid-card:hover .delete-photo,
+.polaroid-card:focus-within .delete-photo {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.polaroid-card:hover .favorite-photo,
+.polaroid-card:focus-within .favorite-photo {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 50ms;
+}
+
+.delete-photo:hover svg {
+  animation: deleteWobble 300ms ease;
+}
+
+@keyframes deleteWobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-12deg);
+  }
+  70% {
+    transform: rotate(8deg);
+  }
+}
+
+.reaction-row button.burst-heart {
+  animation: heartTap 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  color: #ff6f91;
+}
+
+.reaction-row button.burst-sparkle {
+  animation: sparkleTap 380ms ease;
+}
+
+.reaction-row button.burst-favorite {
+  animation: starSpin 400ms ease-in-out;
+}
+
+@keyframes heartTap {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.4); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@keyframes sparkleTap {
+  50% { transform: scale(1.22) rotate(8deg); }
+}
+
+@keyframes starSpin {
+  to { transform: rotate(360deg); }
+}
+
+.reaction-particles {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  pointer-events: none;
+}
+
+.reaction-particles i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: particleUp 600ms ease-out forwards;
+}
+
+.particles-heart i {
+  color: #ff6f91;
+  clip-path: polygon(50% 84%, 8% 42%, 18% 12%, 50% 26%, 82% 12%, 92% 42%);
+}
+
+.particles-sparkle i,
+.particles-favorite i {
+  color: #f6b93b;
+}
+
+.reaction-particles i:nth-child(1) { --x: -16px; --y: -30px; }
+.reaction-particles i:nth-child(2) { --x: -6px; --y: -36px; }
+.reaction-particles i:nth-child(3) { --x: 8px; --y: -32px; }
+.reaction-particles i:nth-child(4) { --x: 18px; --y: -24px; }
+.reaction-particles i:nth-child(5) { --x: 2px; --y: -42px; }
+.reaction-particles i:nth-child(6) { --x: -20px; --y: -16px; }
+
+@keyframes particleUp {
+  from {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) scale(0.5);
+  }
+}
+
+.view-tabs {
+  position: relative;
+}
+
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--active-tab) * 20%);
+  z-index: 0;
+  width: 20%;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+  transition: left 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.view-tabs button {
+  position: relative;
+  z-index: 1;
+}
+
+.view-tabs button.active {
+  background: transparent;
+}
+
+.view-motion-shell {
+  min-height: 420px;
+}
+
+.upload-fan-stack {
+  position: fixed;
+  right: 72px;
+  bottom: 86px;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  width: 170px;
+  height: 124px;
+  pointer-events: none;
+}
+
+.fan-thumb {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 80px;
+  height: 96px;
+  padding: 5px 5px 16px;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(63, 39, 35, 0.22);
+  animation: fanFlyHint 580ms cubic-bezier(0.22, 1, 0.36, 1) 1.65s both;
+}
+
+.fan-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+}
+
+.progress-ring {
+  position: absolute;
+  inset: -6px;
+  width: calc(100% + 12px);
+  height: calc(100% + 12px);
+  transform: rotate(-90deg);
+}
+
+.progress-ring circle {
+  fill: none;
+  stroke: #ff6f91;
+  stroke-width: 3;
+  stroke-dasharray: 107;
+  animation: ringProgress 1.3s ease-out forwards;
+}
+
+@keyframes ringProgress {
+  from { stroke-dashoffset: 107; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fanFlyHint {
+  to {
+    opacity: 0;
+    transform: translate(-80px, -130px) rotate(0deg) scale(0.65);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+
+  .pinned-memory,
+  .polaroid-caption,
+  .added-by,
+  .reaction-row,
+  .reply-form {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}
+
 @media (max-width: 860px) {
   .twine-track {
     left: 28px;

@@ -36,6 +36,7 @@ import {
   AnimatePresence,
   motion,
   useMotionValueEvent,
+  useReducedMotion,
   useScroll,
   useSpring,
   useTransform,
@@ -186,6 +187,7 @@ function RomanceApp({ session }: { session: Session }) {
   const [letterOpen, setLetterOpen] = useState(false);
   const [burst, setBurst] = useState(0);
   const [musicOn, setMusicOn] = useState(false);
+  const [tabIndex, setTabIndex] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const firstLoad = useRef(true);
@@ -283,6 +285,12 @@ function RomanceApp({ session }: { session: Session }) {
         ? date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
         : isSameDay(date, now);
     });
+  const views: ViewName[] = ['timeline', 'calendar', 'map', 'polaroids', 'letters'];
+
+  function switchView(nextView: ViewName) {
+    setView(nextView);
+    setTabIndex(views.indexOf(nextView));
+  }
 
   async function addMemory(draft: DraftMemory) {
     setStatus('Saving your memory...');
@@ -519,20 +527,21 @@ function RomanceApp({ session }: { session: Session }) {
           <span style={{ background: profile.color }}>{profile.name.slice(0, 1).toUpperCase()}</span>
           {profile.name}
         </button>
-        <nav className="view-tabs" aria-label="Views">
-          <ViewButton active={view === 'timeline'} label="Timeline" onClick={() => setView('timeline')}>
+        <nav className="view-tabs" aria-label="Views" style={{ '--active-tab': tabIndex } as React.CSSProperties}>
+          <span className="tab-indicator" aria-hidden="true" />
+          <ViewButton active={view === 'timeline'} label="Timeline" onClick={() => switchView('timeline')}>
             <ListTree size={18} />
           </ViewButton>
-          <ViewButton active={view === 'calendar'} label="Calendar" onClick={() => setView('calendar')}>
+          <ViewButton active={view === 'calendar'} label="Calendar" onClick={() => switchView('calendar')}>
             <CalendarDays size={18} />
           </ViewButton>
-          <ViewButton active={view === 'map'} label="Map" onClick={() => setView('map')}>
+          <ViewButton active={view === 'map'} label="Map" onClick={() => switchView('map')}>
             <Map size={18} />
           </ViewButton>
-          <ViewButton active={view === 'polaroids'} label="Wall" onClick={() => setView('polaroids')}>
+          <ViewButton active={view === 'polaroids'} label="Wall" onClick={() => switchView('polaroids')}>
             <LayoutGrid size={18} />
           </ViewButton>
-          <ViewButton active={view === 'letters'} label="Letters" onClick={() => setView('letters')}>
+          <ViewButton active={view === 'letters'} label="Letters" onClick={() => switchView('letters')}>
             <Gift size={18} />
           </ViewButton>
         </nav>
@@ -610,28 +619,37 @@ function RomanceApp({ session }: { session: Session }) {
       {loading ? (
         <CenteredLoader compact />
       ) : (
-        <>
-          {view === 'timeline' && (
-            <TimelineView
-              items={sorted}
-              session={session}
-              lineHeight={lineHeight}
-              lineProgress={progress}
-              timelineRef={timelineRef}
-              onDelete={deleteMemory}
-              onDeletePhoto={deletePhoto}
-              onFavorite={toggleFavorite}
-              onReact={react}
-              onComment={comment}
-            />
-          )}
-          {view === 'calendar' && <CalendarView items={sorted} />}
-          {view === 'map' && <MapView items={sorted} />}
-          {view === 'polaroids' && <PolaroidWall items={sorted} />}
-          {view === 'letters' && (
-            <LettersView letters={letters} onAdd={() => setLetterOpen(true)} />
-          )}
-        </>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={view}
+            className="view-motion-shell"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            {view === 'timeline' && (
+              <TimelineView
+                items={sorted}
+                session={session}
+                lineHeight={lineHeight}
+                lineProgress={progress}
+                timelineRef={timelineRef}
+                onDelete={deleteMemory}
+                onDeletePhoto={deletePhoto}
+                onFavorite={toggleFavorite}
+                onReact={react}
+                onComment={comment}
+              />
+            )}
+            {view === 'calendar' && <CalendarView items={sorted} />}
+            {view === 'map' && <MapView items={sorted} />}
+            {view === 'polaroids' && <PolaroidWall items={sorted} />}
+            {view === 'letters' && (
+              <LettersView letters={letters} onAdd={() => setLetterOpen(true)} />
+            )}
+          </motion.div>
+        </AnimatePresence>
       )}
 
       <motion.button
@@ -725,10 +743,74 @@ function TimelineView({
   onComment: (item: Milestone, body: string) => void;
 }) {
   const [selected, setSelected] = useState<Milestone | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [passedIds, setPassedIds] = useState<Set<string>>(() => new Set());
+  const [stringRipple, setStringRipple] = useState(false);
+  const [swayBoost, setSwayBoost] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    let frame = 0;
+    let boostTimer = 0;
+
+    function measure() {
+      frame = 0;
+      const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-memory-id]'));
+      const center = window.innerHeight / 2;
+      let nextActive: string | null = null;
+      let closest = Number.POSITIVE_INFINITY;
+      const nextPassed = new Set<string>();
+
+      cards.forEach((card) => {
+        const rect = card.getBoundingClientRect();
+        const id = card.dataset.memoryId || null;
+        if (!id) return;
+        const distance = Math.abs(rect.top + rect.height / 2 - center);
+        if (distance < closest) {
+          closest = distance;
+          nextActive = id;
+        }
+        if (rect.bottom < 0) nextPassed.add(id);
+      });
+
+      setActiveId(nextActive);
+      setPassedIds(nextPassed);
+    }
+
+    function onScroll() {
+      if (!frame) frame = window.requestAnimationFrame(measure);
+      setSwayBoost(true);
+      window.clearTimeout(boostTimer);
+      boostTimer = window.setTimeout(() => setSwayBoost(false), 600);
+    }
+
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.clearTimeout(boostTimer);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [items, prefersReducedMotion]);
+
+  function triggerStringRipple() {
+    if (prefersReducedMotion) return;
+    setStringRipple(false);
+    window.requestAnimationFrame(() => {
+      setStringRipple(true);
+      window.setTimeout(() => setStringRipple(false), 440);
+    });
+  }
 
   return (
     <section className="polaroid-timeline-section" ref={timelineRef}>
-      <div className="twine-track" aria-hidden="true">
+      <div
+        className={`twine-track ${stringRipple ? 'string-ripple' : ''} ${swayBoost ? 'sway-boost' : ''}`}
+        aria-hidden="true"
+      >
         <svg viewBox="0 0 24 1200" preserveAspectRatio="none">
           <line className="twine-base" x1="12" y1="0" x2="12" y2="1200" />
           <motion.line
@@ -756,12 +838,15 @@ function TimelineView({
             item={item}
             isEven={index % 2 === 0}
             userId={session.user.id}
+            isActive={activeId === item.id}
+            isPassed={passedIds.has(item.id)}
             onDelete={() => onDelete(item)}
             onDeletePhoto={(mediaId, storagePath) => onDeletePhoto(item, mediaId, storagePath)}
             onFavorite={() => onFavorite(item)}
             onReact={(kind) => onReact(item, kind)}
             onComment={(body) => onComment(item, body)}
             onOpen={() => setSelected(item)}
+            onLanded={triggerStringRipple}
           />
         ))
       ) : (
@@ -789,27 +874,39 @@ function TimelineCard({
   item,
   isEven,
   userId,
+  isActive,
+  isPassed,
   onDelete,
   onDeletePhoto,
   onFavorite,
   onReact,
   onComment,
   onOpen,
+  onLanded,
 }: {
   item: Milestone;
   isEven: boolean;
   userId: string;
+  isActive: boolean;
+  isPassed: boolean;
   onDelete: () => void;
   onDeletePhoto: (mediaId: string, storagePath: string) => void;
   onFavorite: () => void;
   onReact: (kind: ReactionKind) => void;
   onComment: (body: string) => void;
   onOpen: () => void;
+  onLanded: () => void;
 }) {
   const [slide, setSlide] = useState(0);
   const [reply, setReply] = useState('');
   const [phrase, setPhrase] = useState('');
   const [unlocked, setUnlocked] = useState(!item.unlockPhrase);
+  const [landed, setLanded] = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const [reactionBurst, setReactionBurst] = useState<ReactionKind | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const tiltFrame = useRef(0);
+  const prefersReducedMotion = useReducedMotion();
   const images = item.media.filter((media) => media.mediaType === 'image');
   const gallery = images.length ? images.map((media) => media.signedUrl) : [item.imageUrl];
   const currentMedia = images[slide];
@@ -822,13 +919,52 @@ function TimelineCard({
 
   const restRotation = isEven ? -3 : 4;
 
+  function handleDelete(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (prefersReducedMotion) {
+      onDelete();
+      return;
+    }
+    setExiting(true);
+    window.setTimeout(onDelete, 450);
+  }
+
+  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+    if (prefersReducedMotion || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    if (tiltFrame.current) window.cancelAnimationFrame(tiltFrame.current);
+    tiltFrame.current = window.requestAnimationFrame(() => {
+      cardRef.current?.style.setProperty('--tilt-x', `${(-y * 8).toFixed(2)}deg`);
+      cardRef.current?.style.setProperty('--tilt-y', `${(x * 10).toFixed(2)}deg`);
+    });
+  }
+
+  function resetTilt() {
+    if (tiltFrame.current) window.cancelAnimationFrame(tiltFrame.current);
+    cardRef.current?.style.setProperty('--tilt-x', '0deg');
+    cardRef.current?.style.setProperty('--tilt-y', '0deg');
+  }
+
+  function reactWithBurst(kind: ReactionKind) {
+    setReactionBurst(kind);
+    window.setTimeout(() => setReactionBurst(null), 700);
+    onReact(kind);
+  }
+
   return (
     <motion.article
-      className={`pinned-memory ${isEven ? 'memory-left' : 'memory-right'}`}
+      className={`pinned-memory ${isEven ? 'memory-left' : 'memory-right'} ${landed ? 'has-landed' : ''} ${isActive ? 'is-active' : ''} ${isPassed ? 'is-passed' : ''} ${exiting ? 'is-exiting' : ''}`}
+      data-memory-id={item.id}
       initial={{ opacity: 0, y: -80, rotate: isEven ? -8 : 8, scale: 0.92 }}
       whileInView={{ opacity: 1, y: 0, rotate: restRotation, scale: 1 }}
       viewport={{ amount: 0.36, once: false }}
       transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52 }}
+      onViewportEnter={() => {
+        setLanded(true);
+        onLanded();
+      }}
     >
       <motion.div
         className="peg"
@@ -842,13 +978,16 @@ function TimelineCard({
       <div className="string-connector" aria-hidden="true" />
 
       <motion.div
+        ref={cardRef}
         className="polaroid-card"
         layoutId={`memory-card-${item.id}`}
         whileHover={{ scale: 1.03, rotate: restRotation * 0.65, y: -4 }}
         onClick={onOpen}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={resetTilt}
       >
         <div className="polaroid-actions" onClick={(event) => event.stopPropagation()}>
-          <button className="delete-photo" onClick={onDelete} aria-label={`Remove ${item.title}`}>
+          <button className="delete-photo" onClick={handleDelete} aria-label={`Remove ${item.title}`}>
             <Trash2 size={17} />
           </button>
           <button
@@ -954,12 +1093,19 @@ function TimelineCard({
             return (
               <button
                 key={option.kind}
-                className={active ? 'active' : ''}
-                onClick={() => onReact(option.kind)}
+                className={`${active ? 'active' : ''} ${reactionBurst === option.kind ? `burst-${option.kind}` : ''}`}
+                onClick={() => reactWithBurst(option.kind)}
                 title={option.label}
               >
                 {option.icon}
                 {count > 0 && <span>{count}</span>}
+                {reactionBurst === option.kind && (
+                  <span className={`reaction-particles particles-${option.kind}`}>
+                    {Array.from({ length: option.kind === 'heart' ? 5 : 6 }).map((_, index) => (
+                      <i key={index} />
+                    ))}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1272,15 +1418,44 @@ function MemoryComposer({
   const [previews, setPreviews] = useState<string[]>([]);
   const [advanced, setAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showFanStack, setShowFanStack] = useState(false);
 
   function choosePhotos(files: FileList | null) {
     const selected = Array.from(files || []).slice(0, 8);
     setDraft((current) => ({ ...current, photos: selected }));
     setPreviews(selected.map((file) => URL.createObjectURL(file)));
+    setShowFanStack(selected.length > 1);
+    window.setTimeout(() => setShowFanStack(false), 2600);
   }
 
   return (
     <Modal title="Add a memory" subtitle="A photo, a caption, and the little details." onClose={onClose}>
+      <AnimatePresence>
+        {showFanStack && (
+          <motion.div className="upload-fan-stack" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            {previews.slice(0, 5).map((preview, index) => (
+              <motion.div
+                className="fan-thumb"
+                key={preview}
+                initial={{ scale: 0, y: 16, rotate: 0 }}
+                animate={{
+                  scale: 1,
+                  y: 0,
+                  x: (index - 2) * 10,
+                  rotate: (index - 2) * 5,
+                }}
+                exit={{ scale: 0, y: -20, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 190, damping: 14, delay: index * 0.08 }}
+              >
+                <svg viewBox="0 0 40 40" className="progress-ring" aria-hidden="true">
+                  <circle cx="20" cy="20" r="17" />
+                </svg>
+                <img src={preview} alt="" />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
       <form
         className="memory-form"
         onSubmit={async (event) => {
