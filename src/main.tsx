@@ -11,7 +11,6 @@ import {
   Heart,
   ImagePlus,
   Images,
-  Laugh,
   LayoutGrid,
   ListTree,
   LoaderCircle,
@@ -61,6 +60,8 @@ import {
   toggleReaction,
   uploadMemoryFile,
 } from './romanceApi';
+import { ReactionRow } from './ReactionRow';
+import { MemoryPhotoViewer } from './MemoryPhotoViewer';
 import type {
   LoveLetter,
   Milestone,
@@ -77,12 +78,6 @@ const fallbackImage =
   'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1200&q=85';
 const moodOptions = ['funny', 'soft', 'chaotic', 'first time', 'miss you'];
 const profileColors = ['#e9517d', '#5bbfa5', '#f2a94a', '#6979d9', '#a65d9f'];
-const reactionOptions: Array<{ kind: ReactionKind; label: string; icon: React.ReactNode }> = [
-  { kind: 'heart', label: 'Heart', icon: <Heart size={16} /> },
-  { kind: 'sparkle', label: 'Sparkle', icon: <Sparkles size={16} /> },
-  { kind: 'smile', label: 'Made me smile', icon: <Laugh size={16} /> },
-  { kind: 'favorite', label: 'Favorite', icon: <Star size={16} /> },
-];
 
 type DraftMemory = {
   date: string;
@@ -743,6 +738,8 @@ function TimelineView({
   onComment: (item: Milestone, body: string) => void;
 }) {
   const [selected, setSelected] = useState<Milestone | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const viewerItem = viewerId ? items.find((candidate) => candidate.id === viewerId) ?? null : null;
   const [activeId, setActiveId] = useState<string | null>(null);
   const [passedIds, setPassedIds] = useState<Set<string>>(() => new Set());
   const [stringRipple, setStringRipple] = useState(false);
@@ -805,6 +802,12 @@ function TimelineView({
     });
   }
 
+  function openItem(item: Milestone) {
+    const imageCount = item.media.filter((media) => media.mediaType === 'image').length;
+    if (imageCount > 1) setViewerId(item.id);
+    else setSelected(item);
+  }
+
   return (
     <section className="polaroid-timeline-section" ref={timelineRef}>
       <div
@@ -845,7 +848,7 @@ function TimelineView({
             onFavorite={() => onFavorite(item)}
             onReact={(kind) => onReact(item, kind)}
             onComment={(body) => onComment(item, body)}
-            onOpen={() => setSelected(item)}
+            onOpen={() => openItem(item)}
             onLanded={triggerStringRipple}
           />
         ))
@@ -863,6 +866,17 @@ function TimelineView({
           <MemoryLightbox
             item={selected}
             onClose={() => setSelected(null)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {viewerItem && (
+          <MemoryPhotoViewer
+            item={viewerItem}
+            userId={session.user.id}
+            onClose={() => setViewerId(null)}
+            onReact={(kind) => onReact(viewerItem, kind)}
+            onDeletePhoto={(mediaId, storagePath) => onDeletePhoto(viewerItem, mediaId, storagePath)}
           />
         )}
       </AnimatePresence>
@@ -897,19 +911,17 @@ function TimelineCard({
   onOpen: () => void;
   onLanded: () => void;
 }) {
-  const [slide, setSlide] = useState(0);
   const [reply, setReply] = useState('');
   const [phrase, setPhrase] = useState('');
   const [unlocked, setUnlocked] = useState(!item.unlockPhrase);
   const [landed, setLanded] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [reactionBurst, setReactionBurst] = useState<ReactionKind | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const tiltFrame = useRef(0);
   const prefersReducedMotion = useReducedMotion();
   const images = item.media.filter((media) => media.mediaType === 'image');
-  const gallery = images.length ? images.map((media) => media.signedUrl) : [item.imageUrl];
-  const currentMedia = images[slide];
+  const isStack = images.length > 1;
+  const singleImage = images.length ? images[0].signedUrl : item.imageUrl;
   const timeLocked = item.unlockAt ? new Date(item.unlockAt) > new Date() : false;
   const hidden = timeLocked || (!unlocked && !!item.unlockPhrase);
 
@@ -945,12 +957,6 @@ function TimelineCard({
     if (tiltFrame.current) window.cancelAnimationFrame(tiltFrame.current);
     cardRef.current?.style.setProperty('--tilt-x', '0deg');
     cardRef.current?.style.setProperty('--tilt-y', '0deg');
-  }
-
-  function reactWithBurst(kind: ReactionKind) {
-    setReactionBurst(kind);
-    window.setTimeout(() => setReactionBurst(null), 700);
-    onReact(kind);
   }
 
   return (
@@ -1018,37 +1024,10 @@ function TimelineCard({
                 </div>
               )}
             </div>
+          ) : isStack ? (
+            <PhotoStack images={images.map((media) => media.signedUrl)} alt={item.title} count={images.length} />
           ) : (
-            <img src={gallery[slide]} alt={item.title} loading="lazy" />
-          )}
-          {!hidden && gallery.length > 1 && (
-            <div className="carousel-controls" onClick={(event) => event.stopPropagation()}>
-              <button
-                onClick={() => setSlide((value) => (value - 1 + gallery.length) % gallery.length)}
-                aria-label="Previous photo"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <span>{slide + 1} / {gallery.length}</span>
-              <button
-                onClick={() => setSlide((value) => (value + 1) % gallery.length)}
-                aria-label="Next photo"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
-          {!hidden && currentMedia && (
-            <button
-              className="remove-slide"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDeletePhoto(currentMedia.id, currentMedia.storagePath);
-              }}
-              aria-label="Remove current photo"
-            >
-              <X size={15} />
-            </button>
+            <img src={singleImage} alt={item.title} loading="lazy" />
           )}
         </div>
         <div className="polaroid-caption">
@@ -1082,34 +1061,7 @@ function TimelineCard({
         )}
         <span className="added-by">Added by {item.addedBy}</span>
 
-        <div className="reaction-row">
-          {reactionOptions.map((option) => {
-            const active = item.reactions.some(
-              (reaction) => reaction.userId === userId && reaction.reaction === option.kind,
-            );
-            const count = item.reactions.filter(
-              (reaction) => reaction.reaction === option.kind,
-            ).length;
-            return (
-              <button
-                key={option.kind}
-                className={`${active ? 'active' : ''} ${reactionBurst === option.kind ? `burst-${option.kind}` : ''}`}
-                onClick={() => reactWithBurst(option.kind)}
-                title={option.label}
-              >
-                {option.icon}
-                {count > 0 && <span>{count}</span>}
-                {reactionBurst === option.kind && (
-                  <span className={`reaction-particles particles-${option.kind}`}>
-                    {Array.from({ length: option.kind === 'heart' ? 5 : 6 }).map((_, index) => (
-                      <i key={index} />
-                    ))}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+        <ReactionRow reactions={item.reactions} userId={userId} onReact={onReact} />
 
         <div className="comments">
           {item.comments.map((comment) => (
@@ -1141,6 +1093,27 @@ function TimelineCard({
         </div>
       </div>
     </motion.article>
+  );
+}
+
+function PhotoStack({ images, alt, count }: { images: string[]; alt: string; count: number }) {
+  const layers = images.slice(0, 3);
+  return (
+    <div className="photo-stack">
+      {layers.map((src, indexFromFront) => (
+        <div
+          key={src}
+          className={`stack-layer depth-${indexFromFront}`}
+          style={{ zIndex: layers.length - indexFromFront }}
+        >
+          <img src={src} alt={indexFromFront === 0 ? alt : ''} loading="lazy" />
+        </div>
+      ))}
+      <span className="photo-count-badge">
+        <Images size={13} />
+        {count}
+      </span>
+    </div>
   );
 }
 
