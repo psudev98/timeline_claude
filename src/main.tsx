@@ -585,17 +585,29 @@ function RomanceApp({ session }: { session: Session }) {
       <CountdownBand dates={nextEvents} onAdd={addSpecialDate} />
 
       {thisDay.length > 0 && (
-        <section className="feature-band">
+        <motion.section
+          className="feature-band"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ amount: 0.3, once: false }}
+          transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+        >
           <div>
             <span className="section-kicker">This day again</span>
             <h2>A memory found its way back</h2>
           </div>
           <MiniMemory item={thisDay[0]} />
-        </section>
+        </motion.section>
       )}
 
       {favorites.length > 0 && (
-        <section className="favorites-band">
+        <motion.section
+          className="favorites-band"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ amount: 0.3, once: false }}
+          transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
+        >
           <div className="section-heading">
             <div>
               <span className="section-kicker">Pinned close</span>
@@ -604,11 +616,11 @@ function RomanceApp({ session }: { session: Session }) {
             <Star fill="currentColor" />
           </div>
           <div className="favorites-row">
-            {favorites.slice(0, 4).map((item) => (
-              <MiniMemory key={item.id} item={item} />
+            {favorites.slice(0, 4).map((item, index) => (
+              <MiniMemory key={item.id} item={item} index={index} />
             ))}
           </div>
-        </section>
+        </motion.section>
       )}
 
       {loading ? (
@@ -1282,10 +1294,17 @@ function LettersView({
         </button>
       </div>
       <div className="letter-grid">
-        {letters.map((letter) => {
+        {letters.map((letter, index) => {
           const locked = letter.unlockAt ? new Date(letter.unlockAt) > now : false;
           return (
-            <article className={`letter ${locked ? 'locked' : ''}`} key={letter.id}>
+            <motion.article
+              className={`letter ${locked ? 'locked' : ''}`}
+              key={letter.id}
+              initial={{ opacity: 0, scale: 0.9, y: 12 }}
+              whileInView={{ opacity: 1, scale: 1, y: 0 }}
+              viewport={{ amount: 0.4, once: false }}
+              transition={{ duration: 0.32, delay: index * 0.04, ease: [0.34, 1.56, 0.64, 1] }}
+            >
               {locked ? <Lock /> : <Heart fill="currentColor" />}
               <h3>{letter.title}</h3>
               {locked ? (
@@ -1293,7 +1312,7 @@ function LettersView({
               ) : (
                 <p>{letter.body}</p>
               )}
-            </article>
+            </motion.article>
           );
         })}
         {!letters.length && <EmptyState text="Write something for the future." />}
@@ -1335,31 +1354,37 @@ function CountdownBand({
         <CalendarHeart size={17} />
         Countdown
       </button>
-      {open && (
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onAdd({ title, eventDate, kind, recurring });
-            setTitle('');
-            setOpen(false);
-          }}
-        >
-          <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Next adventure" />
-          <input required type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
-          <select value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="date">Date</option>
-            <option value="birthday">Birthday</option>
-            <option value="trip">Trip</option>
-            <option value="anniversary">Anniversary</option>
-          </select>
-          <label className="check-label">
-            <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
-            Yearly
-          </label>
-          <button type="submit"><Plus size={17} /></button>
-        </form>
-      )}
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.form
+            className="inline-form"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              onAdd({ title, eventDate, kind, recurring });
+              setTitle('');
+              setOpen(false);
+            }}
+          >
+            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Next adventure" />
+            <input required type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="date">Date</option>
+              <option value="birthday">Birthday</option>
+              <option value="trip">Trip</option>
+              <option value="anniversary">Anniversary</option>
+            </select>
+            <label className="check-label">
+              <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
+              Yearly
+            </label>
+            <button type="submit"><Plus size={17} /></button>
+          </motion.form>
+        )}
+      </AnimatePresence>
     </section>
   );
 }
@@ -1392,6 +1417,7 @@ function MemoryComposer({
   const [advanced, setAdvanced] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showFanStack, setShowFanStack] = useState(false);
+  const [poppedMood, setPoppedMood] = useState<string | null>(null);
 
   function choosePhotos(files: FileList | null) {
     const selected = Array.from(files || []).slice(0, 8);
@@ -1399,6 +1425,17 @@ function MemoryComposer({
     setPreviews(selected.map((file) => URL.createObjectURL(file)));
     setShowFanStack(selected.length > 1);
     window.setTimeout(() => setShowFanStack(false), 2600);
+  }
+
+  function toggleMood(mood: string) {
+    setDraft((current) => ({
+      ...current,
+      moods: current.moods.includes(mood)
+        ? current.moods.filter((item) => item !== mood)
+        : [...current.moods, mood],
+    }));
+    setPoppedMood(mood);
+    window.setTimeout(() => setPoppedMood((current) => (current === mood ? null : current)), 260);
   }
 
   return (
@@ -1462,13 +1499,8 @@ function MemoryComposer({
             <button
               type="button"
               key={mood}
-              className={draft.moods.includes(mood) ? 'active' : ''}
-              onClick={() => setDraft({
-                ...draft,
-                moods: draft.moods.includes(mood)
-                  ? draft.moods.filter((item) => item !== mood)
-                  : [...draft.moods, mood],
-              })}
+              className={`${draft.moods.includes(mood) ? 'active' : ''} ${poppedMood === mood ? 'pop' : ''}`}
+              onClick={() => toggleMood(mood)}
             >
               {mood}
             </button>
@@ -1478,22 +1510,30 @@ function MemoryComposer({
           <Settings2 size={16} />
           {advanced ? 'Fewer details' : 'Add voice, place, song, or secret'}
         </button>
-        {advanced && (
-          <div className="advanced-fields">
-            <label className="file-row">
-              <span><Volume2 size={16} /> Voice note</span>
-              <input type="file" accept="audio/*" capture onChange={(e) => setDraft({ ...draft, voice: e.target.files?.[0] || null })} />
-            </label>
-            <label><span>Song URL</span><input type="url" value={draft.songUrl} onChange={(e) => setDraft({ ...draft, songUrl: e.target.value })} placeholder="https://..." /></label>
-            <label><span>Place</span><input value={draft.locationName} onChange={(e) => setDraft({ ...draft, locationName: e.target.value })} placeholder="Where it happened" /></label>
-            <div className="form-grid">
-              <label><span>Latitude</span><input type="number" step="any" value={draft.latitude} onChange={(e) => setDraft({ ...draft, latitude: e.target.value })} /></label>
-              <label><span>Longitude</span><input type="number" step="any" value={draft.longitude} onChange={(e) => setDraft({ ...draft, longitude: e.target.value })} /></label>
-            </div>
-            <label><span>Secret phrase</span><input value={draft.unlockPhrase} onChange={(e) => setDraft({ ...draft, unlockPhrase: e.target.value })} placeholder="Optional phrase to reveal it" /></label>
-            <label><span>Unlock later</span><input type="datetime-local" value={draft.unlockAt} onChange={(e) => setDraft({ ...draft, unlockAt: e.target.value })} /></label>
-          </div>
-        )}
+        <AnimatePresence initial={false}>
+          {advanced && (
+            <motion.div
+              className="advanced-fields"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <label className="file-row">
+                <span><Volume2 size={16} /> Voice note</span>
+                <input type="file" accept="audio/*" capture onChange={(e) => setDraft({ ...draft, voice: e.target.files?.[0] || null })} />
+              </label>
+              <label><span>Song URL</span><input type="url" value={draft.songUrl} onChange={(e) => setDraft({ ...draft, songUrl: e.target.value })} placeholder="https://..." /></label>
+              <label><span>Place</span><input value={draft.locationName} onChange={(e) => setDraft({ ...draft, locationName: e.target.value })} placeholder="Where it happened" /></label>
+              <div className="form-grid">
+                <label><span>Latitude</span><input type="number" step="any" value={draft.latitude} onChange={(e) => setDraft({ ...draft, latitude: e.target.value })} /></label>
+                <label><span>Longitude</span><input type="number" step="any" value={draft.longitude} onChange={(e) => setDraft({ ...draft, longitude: e.target.value })} /></label>
+              </div>
+              <label><span>Secret phrase</span><input value={draft.unlockPhrase} onChange={(e) => setDraft({ ...draft, unlockPhrase: e.target.value })} placeholder="Optional phrase to reveal it" /></label>
+              <label><span>Unlock later</span><input type="datetime-local" value={draft.unlockAt} onChange={(e) => setDraft({ ...draft, unlockAt: e.target.value })} /></label>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <button className="primary-button" disabled={submitting}>
           {submitting ? <LoaderCircle className="spin" size={18} /> : <UploadCloud size={18} />}
           Add to our story
@@ -1593,12 +1633,18 @@ function Modal({
   );
 }
 
-function MiniMemory({ item }: { item: Milestone }) {
+function MiniMemory({ item, index = 0 }: { item: Milestone; index?: number }) {
   return (
-    <article className="mini-memory">
+    <motion.article
+      className="mini-memory"
+      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+      whileInView={{ opacity: 1, scale: 1, y: 0 }}
+      viewport={{ amount: 0.4, once: false }}
+      transition={{ duration: 0.3, delay: index * 0.05, ease: [0.34, 1.56, 0.64, 1] }}
+    >
       <img src={item.imageUrl} alt="" />
       <div><span>{format(parseISO(item.date), 'MMM d')}</span><strong>{item.title}</strong></div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -1615,10 +1661,20 @@ function AuthScreen() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [shake, setShake] = useState(false);
+
+  function triggerShake() {
+    setShake(false);
+    window.requestAnimationFrame(() => {
+      setShake(true);
+      window.setTimeout(() => setShake(false), 420);
+    });
+  }
+
   return (
     <main className="auth-page">
       <motion.form
-        className="auth-card"
+        className={`auth-card ${shake ? 'shake' : ''}`}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         onSubmit={async (event) => {
@@ -1627,6 +1683,7 @@ function AuthScreen() {
           const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
           setLoading(false);
           setMessage(error?.message || '');
+          if (error) triggerShake();
         }}
       >
         <div className="auth-mark"><Lock size={32} /></div>
