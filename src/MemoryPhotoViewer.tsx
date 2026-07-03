@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { Trash2, X } from 'lucide-react';
@@ -62,13 +61,13 @@ export function MemoryPhotoViewer({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [index, photos.length]);
 
-  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     startX.current = event.clientX;
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
-  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragging) return;
     setDragPx(event.clientX - startX.current);
   }

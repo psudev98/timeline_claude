@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import type { ReactNode } from 'react';
+import React, { useState } from 'react';
 import { Heart, Laugh, Sparkles, Star } from 'lucide-react';
 import type { Reaction, ReactionKind } from './types';
 
-export const reactionOptions: Array<{ kind: ReactionKind; label: string; icon: ReactNode }> = [
+export const reactionOptions: Array<{ kind: ReactionKind; label: string; icon: React.ReactNode }> = [
   { kind: 'heart', label: 'Heart', icon: <Heart size={16} /> },
   { kind: 'sparkle', label: 'Sparkle', icon: <Sparkles size={16} /> },
   { kind: 'smile', label: 'Made me smile', icon: <Laugh size={16} /> },
