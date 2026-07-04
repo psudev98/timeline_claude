@@ -16,7 +16,6 @@ import {
   LoaderCircle,
   Lock,
   LogOut,
-  Map,
   MapPin,
   Music2,
   Pause,
@@ -280,7 +279,7 @@ function RomanceApp({ session }: { session: Session }) {
         ? date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
         : isSameDay(date, now);
     });
-  const views: ViewName[] = ['timeline', 'calendar', 'map', 'polaroids', 'letters'];
+  const views: ViewName[] = ['timeline', 'calendar', 'polaroids', 'letters'];
 
   function switchView(nextView: ViewName) {
     setView(nextView);
@@ -530,9 +529,6 @@ function RomanceApp({ session }: { session: Session }) {
           <ViewButton active={view === 'calendar'} label="Calendar" onClick={() => switchView('calendar')}>
             <CalendarDays size={18} />
           </ViewButton>
-          <ViewButton active={view === 'map'} label="Map" onClick={() => switchView('map')}>
-            <Map size={18} />
-          </ViewButton>
           <ViewButton active={view === 'polaroids'} label="Wall" onClick={() => switchView('polaroids')}>
             <LayoutGrid size={18} />
           </ViewButton>
@@ -650,7 +646,6 @@ function RomanceApp({ session }: { session: Session }) {
               />
             )}
             {view === 'calendar' && <CalendarView items={sorted} />}
-            {view === 'map' && <MapView items={sorted} />}
             {view === 'polaroids' && <PolaroidWall items={sorted} />}
             {view === 'letters' && (
               <LettersView letters={letters} onAdd={() => setLetterOpen(true)} />
@@ -1037,7 +1032,13 @@ function TimelineCard({
               )}
             </div>
           ) : isStack ? (
-            <PhotoStack images={images.map((media) => media.signedUrl)} alt={item.title} count={images.length} />
+            <PhotoStack
+              images={images.map((media) => media.signedUrl)}
+              alt={item.title}
+              count={images.length}
+              date={format(parseISO(item.date), 'MMM d')}
+              place={item.locationName}
+            />
           ) : (
             <img src={singleImage} alt={item.title} loading="lazy" />
           )}
@@ -1108,7 +1109,19 @@ function TimelineCard({
   );
 }
 
-function PhotoStack({ images, alt, count }: { images: string[]; alt: string; count: number }) {
+function PhotoStack({
+  images,
+  alt,
+  count,
+  date,
+  place,
+}: {
+  images: string[];
+  alt: string;
+  count: number;
+  date: string;
+  place: string;
+}) {
   const layers = images.slice(0, 3);
   return (
     <div className="photo-stack">
@@ -1125,6 +1138,15 @@ function PhotoStack({ images, alt, count }: { images: string[]; alt: string; cou
         <Images size={13} />
         {count}
       </span>
+      <div className="stack-overlay">
+        <span className="stack-overlay-date">{date}</span>
+        {place && (
+          <span className="stack-overlay-place">
+            <MapPin size={12} />
+            {place}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -1203,43 +1225,6 @@ function CalendarView({ items }: { items: Milestone[] }) {
             </div>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-function MapView({ items }: { items: Milestone[] }) {
-  const mapped = items.filter(
-    (item) => item.latitude !== null && item.longitude !== null,
-  );
-  return (
-    <section className="alternate-view">
-      <div className="view-heading">
-        <div>
-          <span className="section-kicker">Places we keep</span>
-          <h2>Map of memories</h2>
-        </div>
-        <MapPin />
-      </div>
-      <div className="memory-map">
-        {mapped.map((item) => {
-          const left = ((item.longitude! + 180) / 360) * 100;
-          const top = ((90 - item.latitude!) / 180) * 100;
-          return (
-            <button
-              className="map-pin"
-              key={item.id}
-              style={{ left: `${left}%`, top: `${top}%` }}
-              title={`${item.title} - ${item.locationName}`}
-            >
-              <MapPin fill="currentColor" />
-              <span>{item.locationName || item.title}</span>
-            </button>
-          );
-        })}
-        {!mapped.length && (
-          <EmptyState text="Add latitude and longitude to a memory to place it here." />
-        )}
       </div>
     </section>
   );

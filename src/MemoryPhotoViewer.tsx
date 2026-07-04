@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { Trash2, X } from 'lucide-react';
@@ -24,14 +24,20 @@ export function MemoryPhotoViewer({
 }) {
   const photos = item.media.filter((media) => media.mediaType === 'image');
   const [index, setIndex] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [dragPx, setDragPx] = useState(0);
   const [popped, setPopped] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
-  const startX = useRef(0);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const rafId = useRef(0);
+  const indexRef = useRef(0);
 
   function goTo(next: number) {
-    setIndex(clamp(next, 0, photos.length - 1));
+    const clamped = clamp(next, 0, photos.length - 1);
+    slideRefs.current[clamped]?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    });
   }
 
   useEffect(() => {
@@ -41,7 +47,7 @@ export function MemoryPhotoViewer({
 
   useEffect(() => {
     setDetailsVisible(false);
-    const timer = window.setTimeout(() => setDetailsVisible(true), 440);
+    const timer = window.setTimeout(() => setDetailsVisible(true), 120);
     return () => window.clearTimeout(timer);
   }, [index]);
 
@@ -61,27 +67,55 @@ export function MemoryPhotoViewer({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [index, photos.length]);
 
-  function onPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    startX.current = event.clientX;
-    setDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+  const updateSlideStyles = useCallback(() => {
+    rafId.current = 0;
+    const track = trackRef.current;
+    if (!track) return;
+    const trackRect = track.getBoundingClientRect();
+    const center = trackRect.left + trackRect.width / 2;
+    let closestIndex = indexRef.current;
+    let closestDistance = Infinity;
+
+    slideRefs.current.forEach((slide, i) => {
+      if (!slide) return;
+      const rect = slide.getBoundingClientRect();
+      const slideCenter = rect.left + rect.width / 2;
+      const rawDistance = (slideCenter - center) / (rect.width / 2);
+      const distance = clamp(rawDistance, -1, 1);
+      const abs = Math.abs(distance);
+      const scale = 1 - abs * 0.12;
+      const brightness = 1 - abs * 0.35;
+      const blur = abs * 2;
+      slide.style.transform = `scale(${scale})`;
+      slide.style.filter = `brightness(${brightness}) blur(${blur}px)`;
+      const centerDistance = Math.abs(slideCenter - center);
+      if (centerDistance < closestDistance) {
+        closestDistance = centerDistance;
+        closestIndex = i;
+      }
+    });
+
+    if (closestIndex !== indexRef.current) {
+      indexRef.current = closestIndex;
+      setIndex(closestIndex);
+    }
+  }, []);
+
+  function onTrackScroll() {
+    if (!rafId.current) rafId.current = window.requestAnimationFrame(updateSlideStyles);
   }
 
-  function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
-    setDragPx(event.clientX - startX.current);
+  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.currentTarget.scrollBy({ left: event.deltaY });
   }
 
-  function onPointerUp() {
-    if (!dragging) return;
-    const threshold = window.innerWidth * 0.12;
-    if (dragPx <= -threshold) goTo(index + 1);
-    else if (dragPx >= threshold) goTo(index - 1);
-    setDragging(false);
-    setDragPx(0);
-  }
+  useEffect(() => {
+    updateSlideStyles();
+    window.addEventListener('resize', updateSlideStyles);
+    return () => window.removeEventListener('resize', updateSlideStyles);
+  }, [updateSlideStyles]);
 
-  const dragOffsetVw = dragging ? (dragPx / window.innerWidth) * 100 : 0;
   const currentPhoto = photos[index];
 
   if (!currentPhoto) return null;
@@ -114,45 +148,22 @@ export function MemoryPhotoViewer({
           <Trash2 size={17} />
         </button>
 
-        <div
-          className="viewer-viewport"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          <div
-            className="viewer-track"
-            style={{
-              transform: `translateX(calc(${-index * 88}vw + ${dragOffsetVw}vw))`,
-              transition: dragging ? 'none' : 'transform 320ms cubic-bezier(0.25, 1, 0.5, 1)',
-            }}
-          >
-            {photos.map((photo, i) => {
-              const distance = clamp(i - index - dragOffsetVw / 88, -1, 1);
-              const dist = Math.abs(distance);
-              const scale = 1 - dist * 0.12;
-              const brightness = 1 - dist * 0.35;
-              const blur = dist * 2;
-              return (
-                <div
-                  key={photo.id}
-                  className={`viewer-slide ${i === index ? 'is-current' : ''}`}
-                  style={{
-                    transform: `scale(${scale})`,
-                    filter: `brightness(${brightness}) blur(${blur}px)`,
-                    transition: dragging
-                      ? 'none'
-                      : 'transform 320ms cubic-bezier(0.25, 1, 0.5, 1), filter 320ms cubic-bezier(0.25, 1, 0.5, 1)',
-                  }}
-                  onClick={() => {
-                    if (i !== index) goTo(i);
-                  }}
-                >
-                  <img src={photo.signedUrl} alt={item.title} draggable={false} />
-                </div>
-              );
-            })}
+        <div className="viewer-viewport">
+          <div className="viewer-track" ref={trackRef} onScroll={onTrackScroll} onWheel={onWheel}>
+            {photos.map((photo, i) => (
+              <div
+                key={photo.id}
+                ref={(el) => {
+                  slideRefs.current[i] = el;
+                }}
+                className={`viewer-slide ${i === index ? 'is-current' : ''}`}
+                onClick={() => {
+                  if (i !== index) goTo(i);
+                }}
+              >
+                <img src={photo.signedUrl} alt={item.title} draggable={false} />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -170,6 +181,7 @@ export function MemoryPhotoViewer({
         <div className={`viewer-details ${detailsVisible ? 'is-visible' : ''}`}>
           <span className="viewer-date">{format(parseISO(item.date), 'MMMM d, yyyy')}</span>
           <h3>{item.title}</h3>
+          {item.description && <p className="viewer-caption">{item.description}</p>}
           <span className="viewer-added-by">Added by {item.addedBy}</span>
           <ReactionRow reactions={item.reactions} userId={userId} onReact={onReact} />
         </div>
