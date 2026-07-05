@@ -280,6 +280,38 @@ h1 {
   box-shadow: 0 14px 28px rgba(54, 28, 28, 0.22);
 }
 
+.partner-avatar {
+  position: relative;
+  width: 54px;
+  height: 54px;
+}
+
+.partner-avatar-img {
+  display: block;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  object-fit: cover;
+  box-shadow: 0 14px 28px rgba(54, 28, 28, 0.22);
+  background: var(--partner-color);
+}
+
+.avatar-upload-button {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fffaf3;
+  border-radius: 999px;
+  color: white;
+  background: var(--partner-color);
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(54, 28, 28, 0.28);
+}
+
 .partner-card-name {
   font-family: "Caveat", Georgia, serif;
   font-size: 1.8rem;

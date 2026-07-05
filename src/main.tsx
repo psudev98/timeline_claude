@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Session } from '@supabase/supabase-js';
 import {
+  Camera,
   CalendarDays,
   CalendarHeart,
   ChevronLeft,
@@ -80,9 +81,9 @@ const profileColors = ['#e9517d', '#5bbfa5', '#f2a94a', '#6979d9', '#a65d9f'];
 
 type PartnerId = 'deva' | 'aadi';
 
-const partners: { id: PartnerId; name: string; color: string }[] = [
-  { id: 'deva', name: 'Deva', color: '#e9517d' },
-  { id: 'aadi', name: 'Aadi', color: '#5bbfa5' },
+const partners: { id: PartnerId; name: string; color: string; email: string }[] = [
+  { id: 'deva', name: 'Deva', color: '#e9517d', email: import.meta.env.VITE_PARTNER_DEVA_EMAIL || '' },
+  { id: 'aadi', name: 'Aadi', color: '#5bbfa5', email: import.meta.env.VITE_PARTNER_AADI_EMAIL || '' },
 ];
 
 type DraftMemory = {
@@ -1689,12 +1690,15 @@ function CenteredLoader({ compact = false }: { compact?: boolean }) {
 
 function AuthScreen() {
   const [selectedPartner, setSelectedPartner] = useState<PartnerId | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [specialDate, setSpecialDate] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const [burst, setBurst] = useState(0);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const [brokenAvatars, setBrokenAvatars] = useState<Set<PartnerId>>(() => new Set());
+  const [uploadingId, setUploadingId] = useState<PartnerId | null>(null);
+  const [avatarError, setAvatarError] = useState('');
   const prefersReducedMotion = useReducedMotion();
   const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
 
@@ -1713,9 +1717,36 @@ function AuthScreen() {
 
   function goBack() {
     setSelectedPartner(null);
-    setEmail('');
-    setPassword('');
+    setSpecialDate('');
     setMessage('');
+  }
+
+  function avatarUrl(id: PartnerId) {
+    const { data } = supabase.storage.from('avatars').getPublicUrl(id);
+    return `${data.publicUrl}?v=${avatarVersion}`;
+  }
+
+  async function handleAvatarUpload(id: PartnerId, file: File | undefined) {
+    if (!file) return;
+    setUploadingId(id);
+    setAvatarError('');
+    const { error } = await supabase.storage.from('avatars').upload(id, file, {
+      upsert: true,
+      cacheControl: '3600',
+      contentType: file.type,
+    });
+    setUploadingId(null);
+    if (error) {
+      setAvatarError(`Could not upload photo: ${error.message}`);
+      return;
+    }
+    setBrokenAvatars((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setAvatarVersion((value) => value + 1);
   }
 
   return (
@@ -1742,21 +1773,60 @@ function AuthScreen() {
               <p className="auth-prompt">Who's stealing a peek?</p>
               <div className="partner-picker">
                 {partners.map((candidate) => (
-                  <motion.button
-                    type="button"
+                  <motion.div
                     key={candidate.id}
                     className="partner-card"
                     style={{ '--partner-color': candidate.color } as React.CSSProperties}
+                    role="button"
+                    tabIndex={0}
                     whileHover={prefersReducedMotion ? undefined : { scale: 1.03, y: -4 }}
                     whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 22 }}
                     onClick={() => choosePartner(candidate.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        choosePartner(candidate.id);
+                      }
+                    }}
                   >
-                    <span className="partner-card-icon"><Heart size={22} fill="currentColor" /></span>
+                    <div className="partner-avatar">
+                      {brokenAvatars.has(candidate.id) ? (
+                        <span className="partner-card-icon"><Heart size={22} fill="currentColor" /></span>
+                      ) : (
+                        <img
+                          className="partner-avatar-img"
+                          src={avatarUrl(candidate.id)}
+                          alt={candidate.name}
+                          onError={() =>
+                            setBrokenAvatars((current) => new Set(current).add(candidate.id))
+                          }
+                        />
+                      )}
+                      <label
+                        className="avatar-upload-button"
+                        onClick={(event) => event.stopPropagation()}
+                        aria-label={`Upload a photo for ${candidate.name}`}
+                      >
+                        {uploadingId === candidate.id ? (
+                          <LoaderCircle className="spin" size={14} />
+                        ) : (
+                          <Camera size={14} />
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={(event) => handleAvatarUpload(candidate.id, event.target.files?.[0])}
+                        />
+                      </label>
+                    </div>
                     <span className="partner-card-name">{candidate.name}</span>
-                  </motion.button>
+                  </motion.div>
                 ))}
               </div>
+              {avatarError && <p className="form-message">{avatarError}</p>}
             </motion.div>
           ) : (
             <motion.form
@@ -1769,8 +1839,18 @@ function AuthScreen() {
               transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
               onSubmit={async (event) => {
                 event.preventDefault();
+                if (!partner.email) {
+                  setMessage(
+                    `No login email is configured for ${partner.name} yet (missing VITE_PARTNER_${partner.id.toUpperCase()}_EMAIL).`,
+                  );
+                  triggerShake();
+                  return;
+                }
                 setLoading(true);
-                const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+                const { error } = await supabase.auth.signInWithPassword({
+                  email: partner.email,
+                  password: specialDate,
+                });
                 setLoading(false);
                 setMessage(error?.message || '');
                 if (error) triggerShake();
@@ -1779,14 +1859,21 @@ function AuthScreen() {
               <button type="button" className="auth-step-back" onClick={goBack}>
                 <ChevronLeft size={16} /> not you?
               </button>
-              <div className="auth-mark"><Lock size={32} /></div>
+              <div className="auth-mark"><CalendarHeart size={32} /></div>
               <p className="eyebrow auth-eyebrow">Private timeline</p>
               <h1 className="auth-greeting">Hey, {partner.name}</h1>
-              <label><span>User ID</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" /></label>
-              <label><span>Password</span><input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+              <label>
+                <span>Our special date</span>
+                <input
+                  required
+                  type="date"
+                  value={specialDate}
+                  onChange={(e) => setSpecialDate(e.target.value)}
+                />
+              </label>
               {message && (
                 <p className="form-message">
-                  <span className="form-message-lead">That's not quite it, {partner.name} — try again?</span>
+                  <span className="form-message-lead">That's not quite the date, {partner.name} — try again?</span>
                   {message}
                 </p>
               )}

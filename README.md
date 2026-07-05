@@ -42,6 +42,14 @@ photos
 
 The bucket stores photos and voice-note files. Access remains limited to authenticated users through Storage RLS.
 
+Then also run:
+
+```txt
+supabase-avatar-storage.sql
+```
+
+This creates a separate, **public** `avatars` bucket used only for the two profile photos shown on the login screen (so they can be uploaded and viewed before anyone signs in). See the comments in that file for the security trade-off this implies.
+
 If the site says it cannot add a memory, check the message shown in the pink status box. The most common causes are:
 
 - `photos` bucket does not exist.
@@ -56,12 +64,11 @@ The app can now fall back to a basic milestone insert if the optional scrapbook 
 
 In **Supabase > Authentication > Users**, create the two accounts that should access the site.
 
-Each person signs in with:
+The login screen no longer asks for an email or a typed password. Instead:
 
-```txt
-User ID: their Supabase Auth email
-Password: the password assigned to that Auth user
-```
+- Each person picks their own named card, then picks **a date** from a date picker as their "password."
+- Set each account's real Supabase Auth password to that exact date, formatted `YYYY-MM-DD` (e.g. `2024-02-14`). Whatever date is picked in the UI is sent to Supabase as the password string, so it must match exactly.
+- The email each card signs in with comes from environment variables, not from typing - see "Environment variables" below.
 
 After signing in, each person can choose a display name and profile color from the settings button.
 
@@ -72,9 +79,13 @@ Add these in **Vercel > Project > Settings > Environment Variables**:
 ```bash
 VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_PARTNER_DEVA_EMAIL=deva_actual_login_email@example.com
+VITE_PARTNER_AADI_EMAIL=aadi_actual_login_email@example.com
 ```
 
 Use the anon/public key, never the Supabase service-role key.
+
+The two `VITE_PARTNER_*_EMAIL` values are what let the login screen sign each person in without ever showing an email box. They're kept out of the GitHub repo by living only in env vars, but like all `VITE_`-prefixed variables they do get bundled into the site's shipped JavaScript - so treat them as "not in source control" rather than "secret." Anyone who inspects the deployed site's network/JS could still see them.
 
 For local development, put the same values in `.env.local`.
 
