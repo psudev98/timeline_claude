@@ -78,6 +78,13 @@ const fallbackImage =
 const moodOptions = ['funny', 'soft', 'chaotic', 'first time', 'miss you'];
 const profileColors = ['#e9517d', '#5bbfa5', '#f2a94a', '#6979d9', '#a65d9f'];
 
+type PartnerId = 'deva' | 'aadi';
+
+const partners: { id: PartnerId; name: string; color: string }[] = [
+  { id: 'deva', name: 'Deva', color: '#e9517d' },
+  { id: 'aadi', name: 'Aadi', color: '#5bbfa5' },
+];
+
 type DraftMemory = {
   date: string;
   title: string;
@@ -1642,11 +1649,15 @@ function CenteredLoader({ compact = false }: { compact?: boolean }) {
 }
 
 function AuthScreen() {
+  const [selectedPartner, setSelectedPartner] = useState<PartnerId | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
+  const [burst, setBurst] = useState(0);
+  const prefersReducedMotion = useReducedMotion();
+  const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
 
   function triggerShake() {
     setShake(false);
@@ -1656,32 +1667,98 @@ function AuthScreen() {
     });
   }
 
+  function choosePartner(id: PartnerId) {
+    setSelectedPartner(id);
+    setBurst((value) => value + 1);
+  }
+
+  function goBack() {
+    setSelectedPartner(null);
+    setEmail('');
+    setPassword('');
+    setMessage('');
+  }
+
   return (
     <main className="auth-page">
-      <motion.form
-        className={`auth-card ${shake ? 'shake' : ''}`}
+      <motion.div
+        className="auth-card"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        onSubmit={async (event) => {
-          event.preventDefault();
-          setLoading(true);
-          const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-          setLoading(false);
-          setMessage(error?.message || '');
-          if (error) triggerShake();
-        }}
       >
-        <div className="auth-mark"><Lock size={32} /></div>
-        <p className="eyebrow auth-eyebrow">Private timeline</p>
-        <h1>Our Little Timeline</h1>
-        <label><span>User ID</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" /></label>
-        <label><span>Password</span><input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        {message && <p className="form-message">{message}</p>}
-        <button className="primary-button" disabled={loading}>
-          {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
-          Sign in
-        </button>
-      </motion.form>
+        <FloatingHearts keySeed={burst} celebration={false} />
+        <AnimatePresence mode="wait">
+          {!partner ? (
+            <motion.div
+              key="picker"
+              className="auth-step-picker"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              <div className="auth-mark"><Lock size={32} /></div>
+              <p className="eyebrow auth-eyebrow">Private timeline</p>
+              <h1>Our Little Timeline</h1>
+              <p className="auth-prompt">Who's stealing a peek?</p>
+              <div className="partner-picker">
+                {partners.map((candidate) => (
+                  <motion.button
+                    type="button"
+                    key={candidate.id}
+                    className="partner-card"
+                    style={{ '--partner-color': candidate.color } as React.CSSProperties}
+                    whileHover={prefersReducedMotion ? undefined : { scale: 1.03, y: -4 }}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+                    onClick={() => choosePartner(candidate.id)}
+                  >
+                    <span className="partner-card-icon"><Heart size={22} fill="currentColor" /></span>
+                    <span className="partner-card-name">{candidate.name}</span>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.form
+              key="form"
+              className={`partner-form ${shake ? 'auth-form-shake' : ''}`}
+              style={{ '--partner-color': partner.color } as React.CSSProperties}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setLoading(true);
+                const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+                setLoading(false);
+                setMessage(error?.message || '');
+                if (error) triggerShake();
+              }}
+            >
+              <button type="button" className="auth-step-back" onClick={goBack}>
+                <ChevronLeft size={16} /> not you?
+              </button>
+              <div className="auth-mark"><Lock size={32} /></div>
+              <p className="eyebrow auth-eyebrow">Private timeline</p>
+              <h1 className="auth-greeting">Hey, {partner.name}</h1>
+              <label><span>User ID</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" /></label>
+              <label><span>Password</span><input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+              {message && (
+                <p className="form-message">
+                  <span className="form-message-lead">That's not quite it, {partner.name} — try again?</span>
+                  {message}
+                </p>
+              )}
+              <button className="primary-button" disabled={loading}>
+                {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
+                Sign in
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </main>
   );
 }
