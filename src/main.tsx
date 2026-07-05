@@ -351,6 +351,7 @@ function RomanceApp({ session }: { session: Session }) {
       const { data, error } = insertResult;
       if (error) throw error;
 
+      let mediaFailure = '';
       if (photoPaths.length) {
         const { error: mediaError } = await supabase.from('milestone_media').insert(
           photoPaths.map((path, index) => ({
@@ -361,18 +362,26 @@ function RomanceApp({ session }: { session: Session }) {
           })),
         );
         if (mediaError) {
-          setStatus(
-            `Memory saved, but the album table is not ready yet: ${readableError(
-              mediaError,
-              'Run supabase-romance-upgrade.sql.',
-            )}`,
+          console.error('milestone_media insert failed', mediaError);
+          mediaFailure = readableError(
+            mediaError,
+            'Run supabase-romance-upgrade.sql.',
           );
         }
       }
 
       setAddOpen(false);
       setBurst((value) => value + 1);
-      setToast('Memory added to your story');
+      if (mediaFailure && photoPaths.length > 1) {
+        setStatus(
+          `Only the cover photo was saved — the other ${photoPaths.length - 1} photo(s) could not be linked: ${mediaFailure}`,
+        );
+      } else if (mediaFailure) {
+        setStatus(`Memory saved, but the album table is not ready yet: ${mediaFailure}`);
+      } else {
+        setStatus('');
+        setToast('Memory added to your story');
+      }
       await refresh(true);
     } catch (error) {
       setStatus(readableError(error, 'Could not add memory.'));
@@ -583,7 +592,19 @@ function RomanceApp({ session }: { session: Session }) {
         </div>
       </section>
 
-      {status && <div className="status-pill">{status}</div>}
+      <AnimatePresence>
+        {status && (
+          <motion.div
+            className="status-pill"
+            initial={{ opacity: 0, y: -10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+          >
+            {status}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <CountdownBand dates={nextEvents} onAdd={addSpecialDate} />
 
@@ -760,6 +781,8 @@ function TimelineView({
   const [swayBoost, setSwayBoost] = useState(false);
   const prefersReducedMotion = useReducedMotion();
 
+  const passedIdsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (prefersReducedMotion) return;
     let frame = 0;
@@ -785,8 +808,22 @@ function TimelineView({
         if (rect.bottom < 0) nextPassed.add(id);
       });
 
-      setActiveId(nextActive);
-      setPassedIds(nextPassed);
+      setActiveId((current) => (current === nextActive ? current : nextActive));
+
+      const prevPassed = passedIdsRef.current;
+      let changed = prevPassed.size !== nextPassed.size;
+      if (!changed) {
+        for (const id of nextPassed) {
+          if (!prevPassed.has(id)) {
+            changed = true;
+            break;
+          }
+        }
+      }
+      if (changed) {
+        passedIdsRef.current = nextPassed;
+        setPassedIds(nextPassed);
+      }
     }
 
     function onScroll() {
@@ -1002,6 +1039,8 @@ function TimelineCard({
         className="polaroid-card"
         layoutId={`memory-card-${item.id}`}
         whileHover={{ scale: 1.03, rotate: restRotation * 0.65, y: -4 }}
+        whileTap={{ scale: 0.96, rotate: restRotation * 0.3 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 22 }}
         onClick={onOpen}
         onMouseMove={handleMouseMove}
         onMouseLeave={resetTilt}
