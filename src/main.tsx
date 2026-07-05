@@ -81,10 +81,60 @@ const profileColors = ['#e9517d', '#5bbfa5', '#f2a94a', '#6979d9', '#a65d9f'];
 
 type PartnerId = 'deva' | 'aadi';
 
-const partners: { id: PartnerId; name: string; color: string; email: string }[] = [
-  { id: 'deva', name: 'Deva', color: '#e9517d', email: import.meta.env.VITE_PARTNER_DEVA_EMAIL || '' },
-  { id: 'aadi', name: 'Aadi', color: '#5bbfa5', email: import.meta.env.VITE_PARTNER_AADI_EMAIL || '' },
+const partners: { id: PartnerId; name: string; color: string; email: string; authSecret: string }[] = [
+  {
+    id: 'deva',
+    name: 'Deva',
+    color: '#e9517d',
+    email: import.meta.env.VITE_PARTNER_DEVA_EMAIL || '',
+    authSecret: import.meta.env.VITE_PARTNER_DEVA_AUTH_SECRET || '',
+  },
+  {
+    id: 'aadi',
+    name: 'Aadi',
+    color: '#5bbfa5',
+    email: import.meta.env.VITE_PARTNER_AADI_EMAIL || '',
+    authSecret: import.meta.env.VITE_PARTNER_AADI_AUTH_SECRET || '',
+  },
 ];
+
+type TriviaQuestion = {
+  id: 'firstDate' | 'firstKiss' | 'anniversary';
+  prompt: string;
+  answer: string;
+};
+
+const triviaQuestions: TriviaQuestion[] = [
+  { id: 'firstDate', prompt: 'When was our first date?', answer: import.meta.env.VITE_TRIVIA_FIRST_DATE || '' },
+  { id: 'firstKiss', prompt: 'When did we first kiss?', answer: import.meta.env.VITE_TRIVIA_FIRST_KISS || '' },
+  { id: 'anniversary', prompt: "What's our anniversary?", answer: import.meta.env.VITE_TRIVIA_ANNIVERSARY || '' },
+];
+
+const roastPool: string[] = [
+  "Nice try, {name}, but our love story doesn't work that way.",
+  "Wrong! Did you forget already, {name}? Rude.",
+  "{name}, that's adorable, but also completely incorrect.",
+  "Nope. Try harder, {name} — this is important history here.",
+  "Close, {name}... if 'close' meant 'not even in the same year.'",
+  "That's someone else's memory, {name}. Try ours.",
+  "{name}, I'm judging you a little bit right now.",
+  "Wrong date, {name}. Maybe write it down next time?",
+  "Not quite, {name} — and yes, this is going in the relationship archives.",
+  "{name}, that guess was bold. Boldly wrong, but bold.",
+  "Access denied, {name}. Sentimental value insufficient.",
+  "Try again, {name}. Our memories deserve better guesses than that.",
+];
+
+function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
+  const candidates = excludeId ? triviaQuestions.filter((q) => q.id !== excludeId) : triviaQuestions;
+  const pool = candidates.length > 0 ? candidates : triviaQuestions;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function pickRoastLine(name: string): string {
+  const line = roastPool[Math.floor(Math.random() * roastPool.length)];
+  return line.replace(/\{name\}/g, name);
+}
 
 type DraftMemory = {
   date: string;
@@ -1690,8 +1740,10 @@ function CenteredLoader({ compact = false }: { compact?: boolean }) {
 
 function AuthScreen() {
   const [selectedPartner, setSelectedPartner] = useState<PartnerId | null>(null);
-  const [specialDate, setSpecialDate] = useState('');
+  const [answerDate, setAnswerDate] = useState('');
+  const [activeQuestion, setActiveQuestion] = useState<TriviaQuestion>(() => pickRandomQuestion());
   const [message, setMessage] = useState('');
+  const [leadMessage, setLeadMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const [burst, setBurst] = useState(0);
@@ -1713,12 +1765,17 @@ function AuthScreen() {
   function choosePartner(id: PartnerId) {
     setSelectedPartner(id);
     setBurst((value) => value + 1);
+    setActiveQuestion(pickRandomQuestion());
+    setAnswerDate('');
+    setMessage('');
+    setLeadMessage('');
   }
 
   function goBack() {
     setSelectedPartner(null);
-    setSpecialDate('');
+    setAnswerDate('');
     setMessage('');
+    setLeadMessage('');
   }
 
   function avatarUrl(id: PartnerId) {
@@ -1840,20 +1897,43 @@ function AuthScreen() {
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!partner.email) {
+                  setLeadMessage('');
                   setMessage(
                     `No login email is configured for ${partner.name} yet (missing VITE_PARTNER_${partner.id.toUpperCase()}_EMAIL).`,
                   );
                   triggerShake();
                   return;
                 }
+                if (!activeQuestion.answer || !partner.authSecret) {
+                  setLeadMessage('This one still needs setup —');
+                  setMessage(
+                    `This trivia question isn't fully wired up yet (missing the answer or ${partner.name}'s hidden password in the env vars). Ask whoever manages the .env file to fill it in.`,
+                  );
+                  triggerShake();
+                  return;
+                }
+                if (answerDate !== activeQuestion.answer) {
+                  setMessage('');
+                  setLeadMessage(pickRoastLine(partner.name));
+                  setActiveQuestion((current) => pickRandomQuestion(current.id));
+                  setAnswerDate('');
+                  triggerShake();
+                  return;
+                }
                 setLoading(true);
                 const { error } = await supabase.auth.signInWithPassword({
                   email: partner.email,
-                  password: specialDate,
+                  password: partner.authSecret,
                 });
                 setLoading(false);
-                setMessage(error?.message || '');
-                if (error) triggerShake();
+                if (error) {
+                  setLeadMessage('One more snag —');
+                  setMessage(error.message);
+                  triggerShake();
+                } else {
+                  setLeadMessage('');
+                  setMessage('');
+                }
               }}
             >
               <button type="button" className="auth-step-back" onClick={goBack}>
@@ -1863,17 +1943,17 @@ function AuthScreen() {
               <p className="eyebrow auth-eyebrow">Private timeline</p>
               <h1 className="auth-greeting">Hey, {partner.name}</h1>
               <label>
-                <span>Our special date</span>
+                <span>{activeQuestion.prompt}</span>
                 <input
                   required
                   type="date"
-                  value={specialDate}
-                  onChange={(e) => setSpecialDate(e.target.value)}
+                  value={answerDate}
+                  onChange={(e) => setAnswerDate(e.target.value)}
                 />
               </label>
-              {message && (
+              {(leadMessage || message) && (
                 <p className="form-message">
-                  <span className="form-message-lead">That's not quite the date, {partner.name} — try again?</span>
+                  {leadMessage && <span className="form-message-lead">{leadMessage}</span>}
                   {message}
                 </p>
               )}

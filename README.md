@@ -64,11 +64,14 @@ The app can now fall back to a basic milestone insert if the optional scrapbook 
 
 In **Supabase > Authentication > Users**, create the two accounts that should access the site.
 
-The login screen no longer asks for an email or a typed password. Instead:
+The login screen no longer asks for an email or a fixed typed password. Instead:
 
-- Each person picks their own named card, then picks **a date** from a date picker as their "password."
-- Set each account's real Supabase Auth password to that exact date, formatted `YYYY-MM-DD` (e.g. `2024-02-14`). Whatever date is picked in the UI is sent to Supabase as the password string, so it must match exactly.
-- The email each card signs in with comes from environment variables, not from typing - see "Environment variables" below.
+- Each person picks their own named card, then is asked one of three rotating trivia questions about the relationship (first date, first kiss, anniversary) and answers with a date picker.
+- The correct answer to each question is a `YYYY-MM-DD` date stored in an env var (see below) - it's compared entirely in the browser and is never sent to Supabase.
+- Only once the trivia answer matches does the app sign in behind the scenes using a separate, hidden per-partner password (also an env var) that the person never sees or types.
+- Set each account's real Supabase Auth password to that hidden per-partner value (`VITE_PARTNER_DEVA_AUTH_SECRET` / `VITE_PARTNER_AADI_AUTH_SECRET`), **not** to a date anymore.
+- A wrong guess never touches Supabase at all - it just shows a playful message and rolls a new question.
+- The email each card signs in with still comes from environment variables, not from typing - see "Environment variables" below.
 
 After signing in, each person can choose a display name and profile color from the settings button.
 
@@ -81,11 +84,18 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_PARTNER_DEVA_EMAIL=deva_actual_login_email@example.com
 VITE_PARTNER_AADI_EMAIL=aadi_actual_login_email@example.com
+VITE_PARTNER_DEVA_AUTH_SECRET=some_long_random_hidden_password_for_deva
+VITE_PARTNER_AADI_AUTH_SECRET=some_long_random_hidden_password_for_aadi
+VITE_TRIVIA_FIRST_DATE=2024-01-01
+VITE_TRIVIA_FIRST_KISS=2024-01-05
+VITE_TRIVIA_ANNIVERSARY=2024-02-14
 ```
 
 Use the anon/public key, never the Supabase service-role key.
 
 The two `VITE_PARTNER_*_EMAIL` values are what let the login screen sign each person in without ever showing an email box. They're kept out of the GitHub repo by living only in env vars, but like all `VITE_`-prefixed variables they do get bundled into the site's shipped JavaScript - so treat them as "not in source control" rather than "secret." Anyone who inspects the deployed site's network/JS could still see them.
+
+The `VITE_PARTNER_*_AUTH_SECRET` and `VITE_TRIVIA_*` values follow the same rule: kept out of the GitHub repo, but still bundled into the shipped JavaScript like everything else here. Treat the auth-secret values as real passwords anyway (long, random, unique per partner) since they literally are each account's actual Supabase Auth password now.
 
 For local development, put the same values in `.env.local`.
 
