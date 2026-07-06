@@ -404,6 +404,98 @@ h1 {
   font-weight: 700;
 }
 
+.dial-lock-field {
+  display: grid;
+  gap: 7px;
+  color: #654b40;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.dial-lock-prompt {
+  color: #654b40;
+}
+
+.dial-lock-frame {
+  --brass-light: #d8bd82;
+  --brass-dark: #7a6534;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 12px;
+  border-radius: 10px;
+  background: linear-gradient(160deg, var(--brass-light), var(--brass-dark));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--partner-color) 55%, transparent),
+    inset 0 2px 4px rgba(255, 255, 255, 0.4),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.35),
+    0 14px 30px rgba(54, 28, 28, 0.28);
+}
+
+.dial-lock-column {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.35);
+  border-right: 1px dashed rgba(255, 255, 255, 0.35);
+}
+
+.dial-lock-column:first-child {
+  border-left: none;
+}
+
+.dial-lock-column:last-child {
+  border-right: none;
+}
+
+.dial-lock-chevron {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 5px;
+  color: #4b3a20;
+  background: linear-gradient(180deg, #f2dfa8, #c8a765);
+  cursor: pointer;
+}
+
+.dial-lock-chevron:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.dial-lock-display {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #2c2016, #443423);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+  perspective: 500px;
+}
+
+.dial-lock-digit {
+  display: inline-block;
+  color: #ffe9c2;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.dial-lock-label {
+  color: rgba(45, 30, 15, 0.75);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 420px) {
   .partner-picker {
     flex-direction: column;
@@ -3478,6 +3570,10 @@ select {
   .auth-page::before {
     animation: none !important;
     background-position: 0% 50% !important;
+  }
+
+  .dial-lock-digit {
+    transition: none !important;
   }
 
   .ambient-hearts {
