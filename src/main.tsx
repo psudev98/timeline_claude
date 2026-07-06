@@ -679,7 +679,7 @@ function RomanceApp({ session }: { session: Session }) {
           className="feature-band"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ amount: 0.3, once: false }}
+          viewport={{ amount: 0.3, once: true }}
           transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
         >
           <div>
@@ -695,7 +695,7 @@ function RomanceApp({ session }: { session: Session }) {
           className="favorites-band"
           initial={{ opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ amount: 0.3, once: false }}
+          viewport={{ amount: 0.3, once: true }}
           transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
         >
           <div className="section-heading">
@@ -859,21 +859,19 @@ function TimelineView({
 
   useEffect(() => {
     if (prefersReducedMotion) return;
-    let frame = 0;
+    const container = timelineRef.current;
+    if (!container) return;
+
+    const rects = new Map<string, DOMRectReadOnly>();
     let boostTimer = 0;
 
-    function measure() {
-      frame = 0;
-      const cards = Array.from(document.querySelectorAll<HTMLElement>('[data-memory-id]'));
+    function recompute() {
       const center = window.innerHeight / 2;
       let nextActive: string | null = null;
       let closest = Number.POSITIVE_INFINITY;
       const nextPassed = new Set<string>();
 
-      cards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        const id = card.dataset.memoryId || null;
-        if (!id) return;
+      rects.forEach((rect, id) => {
         const distance = Math.abs(rect.top + rect.height / 2 - center);
         if (distance < closest) {
           closest = distance;
@@ -900,23 +898,33 @@ function TimelineView({
       }
     }
 
-    function onScroll() {
-      if (!frame) frame = window.requestAnimationFrame(measure);
-      setSwayBoost(true);
-      window.clearTimeout(boostTimer);
-      boostTimer = window.setTimeout(() => setSwayBoost(false), 600);
-    }
+    // IntersectionObserver lets the browser tell us when a card's visibility
+    // changes instead of us polling every card's position on every scroll
+    // frame - much cheaper on mobile CPUs than the previous rAF +
+    // getBoundingClientRect-per-card approach.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const id = (entry.target as HTMLElement).dataset.memoryId;
+          if (!id) return;
+          rects.set(id, entry.boundingClientRect);
+        });
+        recompute();
+        setSwayBoost(true);
+        window.clearTimeout(boostTimer);
+        boostTimer = window.setTimeout(() => setSwayBoost(false), 600);
+      },
+      { threshold: Array.from({ length: 21 }, (_, index) => index / 20) },
+    );
 
-    measure();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    const cards = container.querySelectorAll<HTMLElement>('[data-memory-id]');
+    cards.forEach((card) => observer.observe(card));
+
     return () => {
-      if (frame) window.cancelAnimationFrame(frame);
+      observer.disconnect();
       window.clearTimeout(boostTimer);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
     };
-  }, [items, prefersReducedMotion]);
+  }, [items, prefersReducedMotion, timelineRef]);
 
   function triggerStringRipple() {
     if (prefersReducedMotion) return;
@@ -1090,7 +1098,7 @@ function TimelineCard({
       data-memory-id={item.id}
       initial={{ opacity: 0, y: -80, rotate: isEven ? -8 : 8, scale: 0.92 }}
       whileInView={{ opacity: 1, y: 0, rotate: restRotation, scale: 1 }}
-      viewport={{ amount: 0.36, once: false }}
+      viewport={{ amount: 0.36, once: true }}
       transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52 }}
       onViewportEnter={() => {
         setLanded(true);
@@ -1101,7 +1109,7 @@ function TimelineCard({
         className="peg"
         initial={{ scale: 0.75, y: -8, opacity: 0 }}
         whileInView={{ scale: [0.8, 1.16, 1], y: 0, opacity: 1 }}
-        viewport={{ amount: 0.4, once: false }}
+        viewport={{ amount: 0.4, once: true }}
         transition={{ duration: 0.38, delay: 0.16 }}
       >
         <span />
@@ -1354,7 +1362,7 @@ function CalendarView({ items }: { items: Milestone[] }) {
               key={day}
               initial={{ opacity: 0, y: 14, scale: 0.94 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
-              viewport={{ amount: 0.4, once: false }}
+              viewport={{ amount: 0.4, once: true }}
               whileHover={prefersReducedMotion ? undefined : { scale: 1.04, y: -3 }}
               transition={{
                 type: 'spring',
@@ -1395,7 +1403,7 @@ function PolaroidWall({ items }: { items: Milestone[] }) {
             whileDrag={{ scale: 1.06, zIndex: 9 }}
             style={{ rotate: `${(index % 5) * 1.4 - 3}deg` }}
           >
-            <img src={item.imageUrl} alt={item.title} />
+            <img src={item.imageUrl} alt={item.title} loading="lazy" />
             <figcaption>{item.title}</figcaption>
           </motion.figure>
         ))}
@@ -1433,7 +1441,7 @@ function LettersView({
               key={letter.id}
               initial={{ opacity: 0, scale: 0.9, y: 12 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
-              viewport={{ amount: 0.4, once: false }}
+              viewport={{ amount: 0.4, once: true }}
               transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52, delay: index * 0.05 }}
             >
               <div className="letter-flap" aria-hidden="true" />
@@ -1773,10 +1781,10 @@ function MiniMemory({ item, index = 0 }: { item: Milestone; index?: number }) {
       className="mini-memory"
       initial={{ opacity: 0, scale: 0.9, y: 10 }}
       whileInView={{ opacity: 1, scale: 1, y: 0 }}
-      viewport={{ amount: 0.4, once: false }}
+      viewport={{ amount: 0.4, once: true }}
       transition={{ duration: 0.3, delay: index * 0.05, ease: [0.34, 1.56, 0.64, 1] }}
     >
-      <img src={item.imageUrl} alt="" />
+      <img src={item.imageUrl} alt="" loading="lazy" />
       <div><span>{format(parseISO(item.date), 'MMM d')}</span><strong>{item.title}</strong></div>
     </motion.article>
   );
