@@ -242,6 +242,7 @@ function RomanceApp({ session }: { session: Session }) {
   const timelineRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const firstLoad = useRef(true);
+  const lastActivity = useRef(Date.now());
   const { scrollYProgress } = useScroll({
     target: timelineRef,
     offset: ['start center', 'end center'],
@@ -300,6 +301,25 @@ function RomanceApp({ session }: { session: Session }) {
   useEffect(() => {
     localStorage.setItem('romance.theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const INACTIVITY_LIMIT_MS = 15 * 60 * 1000;
+    function markActivity() {
+      lastActivity.current = Date.now();
+    }
+    const activityEvents = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'] as const;
+    activityEvents.forEach((event) => window.addEventListener(event, markActivity, { passive: true }));
+    const interval = window.setInterval(() => {
+      if (Date.now() - lastActivity.current >= INACTIVITY_LIMIT_MS) {
+        window.localStorage.setItem('romance.autoLogoutReason', 'inactivity');
+        supabase.auth.signOut();
+      }
+    }, 15000);
+    return () => {
+      activityEvents.forEach((event) => window.removeEventListener(event, markActivity));
+      window.clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
@@ -1783,8 +1803,16 @@ function AuthScreen() {
   const [brokenAvatars, setBrokenAvatars] = useState<Set<PartnerId>>(() => new Set());
   const [uploadingId, setUploadingId] = useState<PartnerId | null>(null);
   const [avatarError, setAvatarError] = useState('');
+  const [idleNotice, setIdleNotice] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
+
+  useEffect(() => {
+    if (window.localStorage.getItem('romance.autoLogoutReason') === 'inactivity') {
+      setIdleNotice(true);
+      window.localStorage.removeItem('romance.autoLogoutReason');
+    }
+  }, []);
 
   function triggerShake() {
     setShake(false);
@@ -1861,6 +1889,9 @@ function AuthScreen() {
               <p className="eyebrow auth-eyebrow">Private timeline</p>
               <h1>Our Little Timeline</h1>
               <p className="auth-prompt">Who's stealing a peek?</p>
+              {idleNotice && (
+                <p className="auth-idle-notice">Signed out after 15 minutes away — welcome back.</p>
+              )}
               <div className="partner-picker">
                 {partners.map((candidate) => (
                   <motion.div
