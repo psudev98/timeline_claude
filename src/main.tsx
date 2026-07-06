@@ -5,8 +5,10 @@ import {
   Camera,
   CalendarDays,
   CalendarHeart,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Download,
   Gift,
   Heart,
@@ -1770,6 +1772,190 @@ function CenteredLoader({ compact = false }: { compact?: boolean }) {
   return <main className={compact ? 'loading-block' : 'auth-page'}><LoaderCircle className="spin" size={34} /></main>;
 }
 
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DIAL_MAX_YEAR = new Date().getFullYear();
+const DIAL_MIN_YEAR = DIAL_MAX_YEAR - 12;
+const DEFAULT_DIAL_PARTS = { day: 1, month: 1, year: DIAL_MIN_YEAR };
+
+function partsFromDialValue(value: string) {
+  if (!value) return DEFAULT_DIAL_PARTS;
+  const parsed = parseISO(value);
+  if (Number.isNaN(parsed.getTime())) return DEFAULT_DIAL_PARTS;
+  return { day: parsed.getDate(), month: parsed.getMonth() + 1, year: parsed.getFullYear() };
+}
+
+function wrap(value: number, min: number, max: number) {
+  const span = max - min + 1;
+  return min + (((value - min) % span) + span) % span;
+}
+
+function DialDigit({
+  columnKind,
+  label,
+  rollDirection,
+  prefersReducedMotion,
+}: {
+  columnKind: string;
+  label: string;
+  rollDirection: 1 | -1;
+  prefersReducedMotion: boolean;
+}) {
+  return (
+    <span className="dial-lock-display" aria-live="polite">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={`${columnKind}-${label}`}
+          className="dial-lock-digit"
+          initial={prefersReducedMotion ? false : { rotateX: rollDirection * 90, opacity: 0 }}
+          animate={{ rotateX: 0, opacity: 1 }}
+          exit={prefersReducedMotion ? undefined : { rotateX: rollDirection * -90, opacity: 0 }}
+          transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+        >
+          {label}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
+function DialLock({
+  value,
+  onChange,
+  accentColor,
+  disabled,
+  prefersReducedMotion,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  accentColor: string;
+  disabled?: boolean;
+  prefersReducedMotion: boolean;
+}) {
+  const { day, month, year } = partsFromDialValue(value);
+  const [rollDirection, setRollDirection] = useState<1 | -1>(1);
+  const maxDay = getDaysInMonth(new Date(year, month - 1));
+
+  function commit(nextDay: number, nextMonth: number, nextYear: number, direction: 1 | -1) {
+    const clampedDay = Math.min(nextDay, getDaysInMonth(new Date(nextYear, nextMonth - 1)));
+    setRollDirection(direction);
+    onChange(format(new Date(nextYear, nextMonth - 1, clampedDay), 'yyyy-MM-dd'));
+  }
+
+  function adjustDay(delta: 1 | -1) {
+    commit(wrap(day + delta, 1, maxDay), month, year, delta);
+  }
+  function adjustMonth(delta: 1 | -1) {
+    commit(day, wrap(month + delta, 1, 12), year, delta);
+  }
+  function adjustYear(delta: 1 | -1) {
+    const nextYear = Math.min(DIAL_MAX_YEAR, Math.max(DIAL_MIN_YEAR, year + delta));
+    commit(day, month, nextYear, delta);
+  }
+
+  const chevronMotionProps = {
+    whileHover: prefersReducedMotion ? undefined : { scale: 1.08 },
+    whileTap: prefersReducedMotion ? undefined : { scale: 0.9 },
+    transition: { type: 'spring' as const, stiffness: 400, damping: 22 },
+  };
+
+  return (
+    <div
+      className="dial-lock-frame"
+      role="group"
+      aria-labelledby="dial-lock-prompt"
+      style={{ '--partner-color': accentColor } as React.CSSProperties}
+    >
+      <div className="dial-lock-column">
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled}
+          onClick={() => adjustDay(1)}
+          aria-label="Increase day"
+          {...chevronMotionProps}
+        >
+          <ChevronUp size={14} />
+        </motion.button>
+        <DialDigit
+          columnKind="day"
+          label={String(day).padStart(2, '0')}
+          rollDirection={rollDirection}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled}
+          onClick={() => adjustDay(-1)}
+          aria-label="Decrease day"
+          {...chevronMotionProps}
+        >
+          <ChevronDown size={14} />
+        </motion.button>
+        <span className="dial-lock-label">Day</span>
+      </div>
+      <div className="dial-lock-column">
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled}
+          onClick={() => adjustMonth(1)}
+          aria-label="Increase month"
+          {...chevronMotionProps}
+        >
+          <ChevronUp size={14} />
+        </motion.button>
+        <DialDigit
+          columnKind="month"
+          label={MONTH_LABELS[month - 1]}
+          rollDirection={rollDirection}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled}
+          onClick={() => adjustMonth(-1)}
+          aria-label="Decrease month"
+          {...chevronMotionProps}
+        >
+          <ChevronDown size={14} />
+        </motion.button>
+        <span className="dial-lock-label">Month</span>
+      </div>
+      <div className="dial-lock-column">
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled || year >= DIAL_MAX_YEAR}
+          onClick={() => adjustYear(1)}
+          aria-label="Increase year"
+          {...chevronMotionProps}
+        >
+          <ChevronUp size={14} />
+        </motion.button>
+        <DialDigit
+          columnKind="year"
+          label={String(year)}
+          rollDirection={rollDirection}
+          prefersReducedMotion={prefersReducedMotion}
+        />
+        <motion.button
+          type="button"
+          className="dial-lock-chevron"
+          disabled={disabled || year <= DIAL_MIN_YEAR}
+          onClick={() => adjustYear(-1)}
+          aria-label="Decrease year"
+          {...chevronMotionProps}
+        >
+          <ChevronDown size={14} />
+        </motion.button>
+        <span className="dial-lock-label">Year</span>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen() {
   const [selectedPartner, setSelectedPartner] = useState<PartnerId | null>(null);
   const [answerDate, setAnswerDate] = useState('');
@@ -1975,15 +2161,16 @@ function AuthScreen() {
               <div className="auth-mark"><CalendarHeart size={32} /></div>
               <p className="eyebrow auth-eyebrow">Private timeline</p>
               <h1 className="auth-greeting">Hey, {partner.name}</h1>
-              <label>
-                <span>{activeQuestion.prompt}</span>
-                <input
-                  required
-                  type="date"
+              <div className="dial-lock-field">
+                <span className="dial-lock-prompt" id="dial-lock-prompt">{activeQuestion.prompt}</span>
+                <DialLock
                   value={answerDate}
-                  onChange={(e) => setAnswerDate(e.target.value)}
+                  onChange={setAnswerDate}
+                  accentColor={partner.color}
+                  disabled={loading}
+                  prefersReducedMotion={!!prefersReducedMotion}
                 />
-              </label>
+              </div>
               {(leadMessage || message) && (
                 <p className="form-message">
                   {leadMessage && <span className="form-message-lead">{leadMessage}</span>}
