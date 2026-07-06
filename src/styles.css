@@ -297,6 +297,16 @@ h1 {
   font-weight: 700;
 }
 
+.auth-idle-notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: #8c3150;
+  background: #ffe8ef;
+  font-size: 0.85rem;
+  font-weight: 750;
+}
+
 .auth-step-picker,
 .partner-form {
   display: grid;
