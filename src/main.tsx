@@ -239,7 +239,6 @@ function RomanceApp({ session }: { session: Session }) {
   const [letterOpen, setLetterOpen] = useState(false);
   const [burst, setBurst] = useState(0);
   const [musicOn, setMusicOn] = useState(false);
-  const [tabIndex, setTabIndex] = useState(0);
   const timelineRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const firstLoad = useRef(true);
@@ -337,11 +336,8 @@ function RomanceApp({ session }: { session: Session }) {
         ? date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
         : isSameDay(date, now);
     });
-  const views: ViewName[] = ['timeline', 'calendar', 'polaroids', 'letters'];
-
   function switchView(nextView: ViewName) {
     setView(nextView);
-    setTabIndex(views.indexOf(nextView));
   }
 
   async function addMemory(draft: DraftMemory) {
@@ -588,8 +584,7 @@ function RomanceApp({ session }: { session: Session }) {
           <span style={{ background: profile.color }}>{profile.name.slice(0, 1).toUpperCase()}</span>
           {profile.name}
         </button>
-        <nav className="view-tabs" aria-label="Views" style={{ '--active-tab': tabIndex } as React.CSSProperties}>
-          <span className="tab-indicator" aria-hidden="true" />
+        <nav className="view-tabs" aria-label="Views">
           <ViewButton active={view === 'timeline'} label="Timeline" onClick={() => switchView('timeline')}>
             <ListTree size={18} />
           </ViewButton>
@@ -781,8 +776,16 @@ function ViewButton({
 }) {
   return (
     <button className={active ? 'active' : ''} onClick={onClick} title={label}>
+      {active && (
+        <motion.span
+          className="tab-indicator"
+          layoutId="tab-indicator"
+          aria-hidden="true"
+          transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+        />
+      )}
       {children}
-      <span>{label}</span>
+      <span className="tab-label">{label}</span>
     </button>
   );
 }
@@ -1293,13 +1296,25 @@ function CalendarView({ items }: { items: Milestone[] }) {
   const [month, setMonth] = useState(new Date());
   const days = Array.from({ length: getDaysInMonth(month) }, (_, index) => index + 1);
   const monthItems = items.filter((item) => isSameMonth(parseISO(item.date), month));
+  const prefersReducedMotion = useReducedMotion();
 
   return (
     <section className="alternate-view calendar-view">
       <div className="view-heading">
         <div>
           <span className="section-kicker">By the month</span>
-          <h2>{format(month, 'MMMM yyyy')}</h2>
+          <AnimatePresence mode="wait">
+            <motion.h2
+              key={format(month, 'yyyy-MM')}
+              className="calendar-month-heading"
+              initial={{ opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -16 }}
+              transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+            >
+              {format(month, 'MMMM yyyy')}
+            </motion.h2>
+          </AnimatePresence>
         </div>
         <div className="pager">
           <button onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>
@@ -1314,12 +1329,26 @@ function CalendarView({ items }: { items: Milestone[] }) {
         {days.map((day) => {
           const memories = monthItems.filter((item) => parseISO(item.date).getDate() === day);
           return (
-            <div className={`calendar-day ${memories.length ? 'has-memory' : ''}`} key={day}>
+            <motion.div
+              className={`calendar-day ${memories.length ? 'has-memory' : ''}`}
+              key={day}
+              initial={{ opacity: 0, y: 14, scale: 0.94 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ amount: 0.4, once: false }}
+              whileHover={prefersReducedMotion ? undefined : { scale: 1.04, y: -3 }}
+              transition={{
+                type: 'spring',
+                stiffness: 130,
+                damping: 11,
+                bounce: 0.52,
+                delay: Math.min(day * 0.012, 0.3),
+              }}
+            >
               <strong>{day}</strong>
               {memories.slice(0, 2).map((item) => (
                 <span key={item.id}>{item.title}</span>
               ))}
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -1385,9 +1414,12 @@ function LettersView({
               initial={{ opacity: 0, scale: 0.9, y: 12 }}
               whileInView={{ opacity: 1, scale: 1, y: 0 }}
               viewport={{ amount: 0.4, once: false }}
-              transition={{ duration: 0.32, delay: index * 0.04, ease: [0.34, 1.56, 0.64, 1] }}
+              transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52, delay: index * 0.05 }}
             >
-              {locked ? <Lock /> : <Heart fill="currentColor" />}
+              <div className="letter-flap" aria-hidden="true" />
+              <span className="letter-seal">
+                {locked ? <Lock size={16} /> : <Heart size={16} fill="currentColor" />}
+              </span>
               <h3>{letter.title}</h3>
               {locked ? (
                 <p>Opens {format(new Date(letter.unlockAt!), 'MMM d, yyyy, h:mm a')}</p>
@@ -1808,6 +1840,7 @@ function AuthScreen() {
 
   return (
     <main className="auth-page">
+      {!prefersReducedMotion && <AmbientHearts />}
       <motion.div
         className="auth-card"
         initial={{ opacity: 0, y: 20 }}
@@ -1990,6 +2023,40 @@ function FloatingHearts({ keySeed, celebration }: { keySeed: number; celebration
           </motion.span>
         ))}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function AmbientHearts() {
+  const glyphs = ['♥', '✦'];
+  const particles = useMemo(
+    () =>
+      Array.from({ length: 14 }, (_, index) => ({
+        id: index,
+        left: (index * 37) % 100,
+        size: 14 + ((index * 7) % 14),
+        duration: 14 + (index % 5) * 3,
+        delay: (index * 0.9) % 12,
+        glyph: glyphs[index % glyphs.length],
+      })),
+    [],
+  );
+  return (
+    <div className="ambient-hearts" aria-hidden="true">
+      {particles.map((p) => (
+        <span
+          key={p.id}
+          className="ambient-heart"
+          style={{
+            left: `${p.left}%`,
+            fontSize: p.size,
+            animationDuration: `${p.duration}s`,
+            animationDelay: `${p.delay}s`,
+          }}
+        >
+          {p.glyph}
+        </span>
+      ))}
     </div>
   );
 }

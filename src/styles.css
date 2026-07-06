@@ -160,6 +160,8 @@ h1 {
 }
 
 .auth-page {
+  position: relative;
+  overflow: hidden;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -170,7 +172,57 @@ h1 {
       center / cover;
 }
 
+.auth-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(233, 81, 125, 0.28),
+    rgba(244, 123, 96, 0.22),
+    rgba(91, 191, 165, 0.2),
+    rgba(242, 189, 88, 0.24)
+  );
+  background-size: 300% 300%;
+  animation: authGradientShift 22s ease-in-out infinite;
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+
+@keyframes authGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.ambient-hearts {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-heart {
+  position: absolute;
+  bottom: -40px;
+  color: var(--rose);
+  opacity: 0;
+  animation-name: float-particle;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
 .auth-card {
+  position: relative;
+  z-index: 2;
   display: grid;
   gap: 16px;
   width: min(430px, 100%);
@@ -1498,7 +1550,17 @@ select {
 }
 
 .calendar-day strong {
+  font-family: "Caveat", Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 700;
   color: var(--muted);
+}
+
+.calendar-month-heading {
+  font-family: "Caveat", Georgia, serif;
+  font-weight: 700;
+  font-size: clamp(2.2rem, 6vw, 3.8rem);
+  line-height: 1;
 }
 
 .calendar-day span {
@@ -1565,6 +1627,8 @@ select {
 }
 
 .letter {
+  position: relative;
+  perspective: 600px;
   min-height: 230px;
   padding: 22px;
   border: 1px solid rgba(108, 76, 67, 0.14);
@@ -1583,13 +1647,59 @@ select {
   box-shadow: 0 26px 56px rgba(69, 45, 40, 0.18);
 }
 
-.letter > svg {
-  color: var(--accent);
+.letter-flap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: linear-gradient(160deg, #fffaf3, #f2e6d8);
+  clip-path: polygon(0 0, 50% 46%, 100% 0);
+  border-radius: 8px 8px 0 0;
+  transform-origin: top center;
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+.letter.locked:hover .letter-flap {
+  transform: rotateX(-16deg) translateY(-2px);
+}
+
+.letter-seal {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  transform: translateX(-50%) rotate(-6deg);
+  border-radius: 46% 54% 52% 48% / 48% 46% 54% 52%;
+  background: radial-gradient(circle at 34% 30%, var(--coral), var(--rose) 72%);
+  color: #fff8f2;
+  box-shadow: 0 6px 14px rgba(69, 45, 40, 0.35), inset 0 -3px 6px rgba(0, 0, 0, 0.22);
+}
+
+.letter.locked:hover .letter-seal {
+  animation: seal-wobble 480ms ease;
+}
+
+@keyframes seal-wobble {
+  0%,
+  100% {
+    transform: translateX(-50%) rotate(-6deg);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-1deg) scale(1.08);
+  }
 }
 
 .letter h3 {
   margin: 30px 0 10px;
-  font-size: 1.35rem;
+  font-family: "Caveat", Georgia, serif;
+  font-weight: 700;
+  font-size: 1.85rem;
 }
 
 .letter p {
@@ -2102,7 +2212,7 @@ select {
     justify-content: flex-end;
   }
 
-  .view-tabs span {
+  .view-tabs .tab-label {
     display: none;
   }
 
@@ -2905,22 +3015,6 @@ select {
   }
 }
 
-.view-tabs {
-  position: relative;
-}
-
-.tab-indicator {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--active-tab) * 25%);
-  z-index: 0;
-  width: 25%;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.16);
-  transition: left 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
 .view-tabs button {
   position: relative;
   z-index: 1;
@@ -2928,6 +3022,20 @@ select {
 
 .view-tabs button.active {
   background: transparent;
+}
+
+.tab-indicator {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.view-tabs button svg,
+.view-tabs button .tab-label {
+  position: relative;
+  z-index: 1;
 }
 
 .view-motion-shell {
@@ -3355,7 +3463,9 @@ select {
   .letter,
   .mini-memory,
   .feature-band,
-  .favorites-band {
+  .favorites-band,
+  .calendar-day,
+  .calendar-month-heading {
     opacity: 1 !important;
     transform: none !important;
   }
@@ -3363,6 +3473,15 @@ select {
   .auth-form-shake {
     animation: none !important;
     transform: none !important;
+  }
+
+  .auth-page::before {
+    animation: none !important;
+    background-position: 0% 50% !important;
+  }
+
+  .ambient-hearts {
+    display: none !important;
   }
 }
 
