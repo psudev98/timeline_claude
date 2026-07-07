@@ -123,6 +123,9 @@ const roastPool: string[] = [
   "{name}, that guess was bold. Boldly wrong, but bold.",
   "Access denied, {name}. Sentimental value insufficient.",
   "Try again, {name}. Our memories deserve better guesses than that.",
+  "{name}, even the algorithm is disappointed.",
+  "That date belongs to somebody else's love story.",
+  "Wrong. But I admire the confidence.",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
@@ -259,7 +262,11 @@ function RomanceApp({ session }: { session: Session }) {
       setSpecialDates(data.specialDates);
       setStatus('');
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not load your shared space.');
+      setStatus(
+        error instanceof Error
+          ? `Our little corner is being shy right now — ${error.message}`
+          : 'Our little corner is being shy right now.',
+      );
     } finally {
       setLoading(false);
     }
@@ -272,7 +279,7 @@ function RomanceApp({ session }: { session: Session }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'milestones' }, (payload) => {
         refresh(true);
         if (!firstLoad.current && payload.eventType === 'INSERT') {
-          setToast('A new memory just arrived');
+          setToast('A new memory just landed on our string');
           setBurst((value) => value + 1);
         }
       })
@@ -361,7 +368,7 @@ function RomanceApp({ session }: { session: Session }) {
   }
 
   async function addMemory(draft: DraftMemory) {
-    setStatus('Saving your memory...');
+    setStatus('Tucking this moment into place...');
     try {
       const photoPaths = await Promise.all(
         draft.photos.map((file) => uploadMemoryFile(session.user.id, file, 'photos')),
@@ -451,13 +458,13 @@ function RomanceApp({ session }: { session: Session }) {
       }
       await refresh(true);
     } catch (error) {
-      setStatus(readableError(error, 'Could not add memory.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not add memory.')}`);
     }
   }
 
   async function deleteMemory(item: Milestone) {
-    if (!window.confirm(`Remove "${item.title}" and its uploaded files?`)) return;
-    setStatus('Removing memory...');
+    if (!window.confirm(`Let "${item.title}" go, along with everything attached to it?`)) return;
+    setStatus('Letting this one go...');
     try {
       const paths = new Set(
         [
@@ -473,15 +480,15 @@ function RomanceApp({ session }: { session: Session }) {
       const { error } = await supabase.from('milestones').delete().eq('id', item.id);
       if (error) throw error;
       setMilestones((items) => items.filter((candidate) => candidate.id !== item.id));
-      setToast('Memory removed');
+      setToast('Let go, gently');
       setStatus('');
     } catch (error) {
-      setStatus(readableError(error, 'Could not remove memory.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not remove memory.')}`);
     }
   }
 
   async function deletePhoto(item: Milestone, mediaId: string, storagePath: string) {
-    if (!window.confirm('Remove this photo from the album?')) return;
+    if (!window.confirm('Take this one out of the album?')) return;
     try {
       const { error: storageError } = await supabase.storage.from('photos').remove([storagePath]);
       if (storageError) throw storageError;
@@ -497,10 +504,10 @@ function RomanceApp({ session }: { session: Session }) {
           .eq('id', item.id);
         if (legacyError) throw legacyError;
       }
-      setToast('Photo removed from the album');
+      setToast('One photo quietly stepped away');
       await refresh(true);
     } catch (error) {
-      setStatus(readableError(error, 'Could not remove photo.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not remove photo.')}`);
     }
   }
 
@@ -521,7 +528,7 @@ function RomanceApp({ session }: { session: Session }) {
       await toggleReaction(item.id, session.user.id, kind, active);
       await refresh(true);
     } catch (error) {
-      setStatus(readableError(error, 'Could not save reaction.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not save reaction.')}`);
     }
   }
 
@@ -530,7 +537,7 @@ function RomanceApp({ session }: { session: Session }) {
       await addComment(item.id, session.user.id, profile, body);
       await refresh(true);
     } catch (error) {
-      setStatus(readableError(error, 'Could not add reply.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not add reply.')}`);
     }
   }
 
@@ -541,7 +548,7 @@ function RomanceApp({ session }: { session: Session }) {
       setSettingsOpen(false);
       setToast('Your profile has a new glow');
     } catch (error) {
-      setStatus(readableError(error, 'Could not update profile.'));
+      setStatus(`Something got in the way of that — ${readableError(error, 'Could not update profile.')}`);
     }
   }
 
@@ -575,7 +582,7 @@ function RomanceApp({ session }: { session: Session }) {
     });
     if (error) setStatus(error.message);
     else {
-      setToast('Countdown added');
+      setToast('Marked the calendar for us');
       refresh(true);
     }
   }
@@ -683,8 +690,8 @@ function RomanceApp({ session }: { session: Session }) {
           transition={{ duration: 0.4, ease: [0.34, 1.56, 0.64, 1] }}
         >
           <div>
-            <span className="section-kicker">This day again</span>
-            <h2>A memory found its way back</h2>
+            <span className="section-kicker">Back to this day</span>
+            <h2>This moment came looking for you</h2>
           </div>
           <MiniMemory item={thisDay[0]} />
         </motion.section>
@@ -700,7 +707,7 @@ function RomanceApp({ session }: { session: Session }) {
         >
           <div className="section-heading">
             <div>
-              <span className="section-kicker">Pinned close</span>
+              <span className="section-kicker">Held close</span>
               <h2>Favorite memories</h2>
             </div>
             <Star fill="currentColor" />
@@ -964,8 +971,8 @@ function TimelineView({
       </div>
       <div className="polaroid-intro">
         <span className="section-kicker">Pinned to the string</span>
-        <h2>Couple Memories Timeline</h2>
-        <p>Scroll down and each Polaroid drops into place like it was clipped there by hand.</p>
+        <h2>The String Between Us</h2>
+        <p>Scroll on — each polaroid drops into place like we pinned it there ourselves.</p>
       </div>
       {items.length ? (
         items.map((item, index) => (
@@ -989,8 +996,8 @@ function TimelineView({
         <div className="empty-polaroid-line">
           <div className="empty-polaroid">
             <Heart size={28} fill="currentColor" />
-            <strong>Add your first shared memory.</strong>
-            <span>The string is waiting for its first photo.</span>
+            <strong>The string is empty, waiting for us to fill it.</strong>
+            <span>Just add your first photo — the rest will follow.</span>
           </div>
         </div>
       )}
@@ -1143,7 +1150,7 @@ function TimelineCard({
           {hidden ? (
             <div className="secret-memory">
               <Lock size={30} />
-              <strong>{timeLocked ? 'A future memory' : 'A tiny secret'}</strong>
+              <strong>{timeLocked ? 'Still to come' : 'A secret, for now'}</strong>
               {timeLocked ? (
                 <span>Opens {format(new Date(item.unlockAt!), 'MMM d, yyyy')}</span>
               ) : (
@@ -1330,7 +1337,7 @@ function CalendarView({ items }: { items: Milestone[] }) {
     <section className="alternate-view calendar-view">
       <div className="view-heading">
         <div>
-          <span className="section-kicker">By the month</span>
+          <span className="section-kicker">Day by day</span>
           <AnimatePresence mode="wait">
             <motion.h2
               key={format(month, 'yyyy-MM')}
@@ -1389,8 +1396,8 @@ function PolaroidWall({ items }: { items: Milestone[] }) {
     <section className="alternate-view">
       <div className="view-heading">
         <div>
-          <span className="section-kicker">Move them around</span>
-          <h2>Polaroid wall</h2>
+          <span className="section-kicker">Shuffle us around</span>
+          <h2>The Wall of Us</h2>
         </div>
         <Images />
       </div>
@@ -1425,11 +1432,11 @@ function LettersView({
       <div className="view-heading">
         <div>
           <span className="section-kicker">For another day</span>
-          <h2>Love letter drawer</h2>
+          <h2>The Letter Drawer</h2>
         </div>
         <button className="secondary-button" onClick={onAdd}>
           <Plus size={17} />
-          New letter
+          Write one
         </button>
       </div>
       <div className="letter-grid">
@@ -1457,7 +1464,7 @@ function LettersView({
             </motion.article>
           );
         })}
-        {!letters.length && <EmptyState text="Write something for the future." />}
+        {!letters.length && <EmptyState text="Leave something for our future selves to find." />}
       </div>
     </section>
   );
@@ -1490,7 +1497,7 @@ function CountdownBand({
             <p><strong>days</strong>{event.title}</p>
           </div>
         ))}
-        {!dates.length && <p className="quiet-copy">Add a birthday, trip, or next date.</p>}
+        {!dates.length && <p className="quiet-copy">Give us something to count down to.</p>}
       </div>
       <button className="secondary-button" onClick={() => setOpen((value) => !value)}>
         <CalendarHeart size={17} />
@@ -1511,7 +1518,7 @@ function CountdownBand({
               setOpen(false);
             }}
           >
-            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Next adventure" />
+            <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Our next adventure" />
             <input required type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
             <select value={kind} onChange={(e) => setKind(e.target.value)}>
               <option value="date">Date</option>
@@ -1521,7 +1528,7 @@ function CountdownBand({
             </select>
             <label className="check-label">
               <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} />
-              Yearly
+              Every year
             </label>
             <button type="submit"><Plus size={17} /></button>
           </motion.form>
@@ -1626,7 +1633,7 @@ function MemoryComposer({
           ) : (
             <>
               <ImagePlus size={30} />
-              <span>Choose up to 8 photos</span>
+              <span>Bring up to 8 photos</span>
             </>
           )}
         </label>
@@ -1863,7 +1870,7 @@ function AuthScreen() {
     });
     setUploadingId(null);
     if (error) {
-      setAvatarError(`Could not upload photo: ${error.message}`);
+      setAvatarError(`That photo got shy on the way up — ${error.message}`);
       return;
     }
     setBrokenAvatars((current) => {
@@ -1891,11 +1898,11 @@ function AuthScreen() {
             <FloatingHearts keySeed={burst} celebration={burst > 0} />
             <div className="partner-picker-header">
               <div className="auth-mark"><Lock size={32} /></div>
-              <p className="eyebrow auth-eyebrow">Private timeline</p>
+              <p className="eyebrow auth-eyebrow">Just the two of us</p>
               <h1>Our Little Timeline</h1>
-              <p className="auth-prompt">Who's stealing a peek?</p>
+              <p className="auth-prompt">Who's come to relive us?</p>
               {idleNotice && (
-                <p className="auth-idle-notice">Signed out after 15 minutes away — welcome back.</p>
+                <p className="auth-idle-notice">You wandered off for a bit — welcome back to us.</p>
               )}
             </div>
             <div className="partner-panels">
@@ -1947,7 +1954,7 @@ function AuthScreen() {
                   return;
                 }
                 if (!activeQuestion.answer || !partner.authSecret) {
-                  setLeadMessage('This one still needs setup —');
+                  setLeadMessage('Not quite ready for you yet —');
                   setMessage(
                     `This trivia question isn't fully wired up yet (missing the answer or ${partner.name}'s hidden password in the env vars). Ask whoever manages the .env file to fill it in.`,
                   );
@@ -1969,7 +1976,7 @@ function AuthScreen() {
                 });
                 setLoading(false);
                 if (error) {
-                  setLeadMessage('One more snag —');
+                  setLeadMessage('The universe hit a snag —');
                   setMessage(error.message);
                   triggerShake();
                 } else {
@@ -1979,11 +1986,11 @@ function AuthScreen() {
               }}
             >
               <button type="button" className="auth-step-back" onClick={goBack}>
-                <ChevronLeft size={16} /> not you?
+                <ChevronLeft size={16} /> someone else?
               </button>
               <div className="auth-mark"><CalendarHeart size={32} /></div>
-              <p className="eyebrow auth-eyebrow">Private timeline</p>
-              <h1 className="auth-greeting">Hey, {partner.name}</h1>
+              <p className="eyebrow auth-eyebrow">Just the two of us</p>
+              <h1 className="auth-greeting">There you are, {partner.name}.</h1>
               <label>
                 <span>{activeQuestion.prompt}</span>
                 <input
@@ -2001,7 +2008,7 @@ function AuthScreen() {
               )}
               <button className="primary-button" disabled={loading}>
                 {loading ? <LoaderCircle className="spin" size={18} /> : <Sparkles size={18} />}
-                Sign in
+                Step inside
               </button>
             </motion.form>
           </motion.div>
