@@ -1812,6 +1812,7 @@ function AuthScreen() {
   const [uploadingId, setUploadingId] = useState<PartnerId | null>(null);
   const [avatarError, setAvatarError] = useState('');
   const [idleNotice, setIdleNotice] = useState(false);
+  const [hoveredId, setHoveredId] = useState<PartnerId | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
 
@@ -1877,22 +1878,18 @@ function AuthScreen() {
   return (
     <main className="auth-page">
       {!prefersReducedMotion && <AmbientHearts />}
-      <motion.div
-        className="auth-card"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <FloatingHearts keySeed={burst} celebration={false} />
-        <AnimatePresence mode="wait">
-          {!partner ? (
-            <motion.div
-              key="picker"
-              className="auth-step-picker"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
-            >
+      <AnimatePresence mode="wait">
+        {!partner ? (
+          <motion.div
+            key="picker"
+            className="partner-picker-screen"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            <FloatingHearts keySeed={burst} celebration={burst > 0} />
+            <div className="partner-picker-header">
               <div className="auth-mark"><Lock size={32} /></div>
               <p className="eyebrow auth-eyebrow">Private timeline</p>
               <h1>Our Little Timeline</h1>
@@ -1900,72 +1897,45 @@ function AuthScreen() {
               {idleNotice && (
                 <p className="auth-idle-notice">Signed out after 15 minutes away — welcome back.</p>
               )}
-              <div className="partner-picker">
-                {partners.map((candidate) => (
-                  <motion.div
-                    key={candidate.id}
-                    className="partner-card"
-                    style={{ '--partner-color': candidate.color } as React.CSSProperties}
-                    role="button"
-                    tabIndex={0}
-                    whileHover={prefersReducedMotion ? undefined : { scale: 1.03, y: -4 }}
-                    whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 22 }}
-                    onClick={() => choosePartner(candidate.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        choosePartner(candidate.id);
-                      }
-                    }}
-                  >
-                    <div className="partner-avatar">
-                      {brokenAvatars.has(candidate.id) ? (
-                        <span className="partner-card-icon"><Heart size={22} fill="currentColor" /></span>
-                      ) : (
-                        <img
-                          className="partner-avatar-img"
-                          src={avatarUrl(candidate.id)}
-                          alt={candidate.name}
-                          onError={() =>
-                            setBrokenAvatars((current) => new Set(current).add(candidate.id))
-                          }
-                        />
-                      )}
-                      <label
-                        className="avatar-upload-button"
-                        onClick={(event) => event.stopPropagation()}
-                        aria-label={`Upload a photo for ${candidate.name}`}
-                      >
-                        {uploadingId === candidate.id ? (
-                          <LoaderCircle className="spin" size={14} />
-                        ) : (
-                          <Camera size={14} />
-                        )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={(event) => handleAvatarUpload(candidate.id, event.target.files?.[0])}
-                        />
-                      </label>
-                    </div>
-                    <span className="partner-card-name">{candidate.name}</span>
-                  </motion.div>
-                ))}
-              </div>
-              {avatarError && <p className="form-message">{avatarError}</p>}
-            </motion.div>
-          ) : (
+            </div>
+            <div className="partner-panels">
+              {partners.map((candidate) => (
+                <PartnerPanel
+                  key={candidate.id}
+                  candidate={candidate}
+                  avatarUrl={avatarUrl(candidate.id)}
+                  brokenAvatar={brokenAvatars.has(candidate.id)}
+                  uploading={uploadingId === candidate.id}
+                  isHovered={!prefersReducedMotion && hoveredId === candidate.id}
+                  isDimmed={!prefersReducedMotion && hoveredId !== null && hoveredId !== candidate.id}
+                  prefersReducedMotion={!!prefersReducedMotion}
+                  onHover={() => setHoveredId(candidate.id)}
+                  onLeave={() =>
+                    setHoveredId((current) => (current === candidate.id ? null : current))
+                  }
+                  onSelect={() => choosePartner(candidate.id)}
+                  onImgError={() =>
+                    setBrokenAvatars((current) => new Set(current).add(candidate.id))
+                  }
+                  onUpload={(file) => handleAvatarUpload(candidate.id, file)}
+                />
+              ))}
+            </div>
+            {avatarError && <p className="form-message partner-picker-error">{avatarError}</p>}
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            className="auth-card"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+          >
+            <FloatingHearts keySeed={burst} celebration={burst > 0} />
             <motion.form
-              key="form"
               className={`partner-form ${shake ? 'auth-form-shake' : ''}`}
               style={{ '--partner-color': partner.color } as React.CSSProperties}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
               onSubmit={async (event) => {
                 event.preventDefault();
                 if (!partner.email) {
@@ -2034,10 +2004,106 @@ function AuthScreen() {
                 Sign in
               </button>
             </motion.form>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
+  );
+}
+
+function PartnerPanel({
+  candidate,
+  avatarUrl,
+  brokenAvatar,
+  uploading,
+  isHovered,
+  isDimmed,
+  prefersReducedMotion,
+  onHover,
+  onLeave,
+  onSelect,
+  onImgError,
+  onUpload,
+}: {
+  candidate: { id: PartnerId; name: string; color: string };
+  avatarUrl: string;
+  brokenAvatar: boolean;
+  uploading: boolean;
+  isHovered: boolean;
+  isDimmed: boolean;
+  prefersReducedMotion: boolean;
+  onHover: () => void;
+  onLeave: () => void;
+  onSelect: () => void;
+  onImgError: () => void;
+  onUpload: (file: File | undefined) => void;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const tiltFrame = useRef(0);
+
+  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+    onHover();
+    if (prefersReducedMotion || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width - 0.5;
+    const y = (event.clientY - rect.top) / rect.height - 0.5;
+    if (tiltFrame.current) window.cancelAnimationFrame(tiltFrame.current);
+    tiltFrame.current = window.requestAnimationFrame(() => {
+      cardRef.current?.style.setProperty('--tilt-x', `${(-y * 8).toFixed(2)}deg`);
+      cardRef.current?.style.setProperty('--tilt-y', `${(x * 10).toFixed(2)}deg`);
+    });
+  }
+
+  function handleMouseLeave() {
+    if (tiltFrame.current) window.cancelAnimationFrame(tiltFrame.current);
+    cardRef.current?.style.setProperty('--tilt-x', '0deg');
+    cardRef.current?.style.setProperty('--tilt-y', '0deg');
+    onLeave();
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      className={`partner-panel ${isHovered ? 'is-hovered' : ''} ${isDimmed ? 'is-dimmed' : ''}`}
+      style={{ '--partner-color': candidate.color } as React.CSSProperties}
+      role="button"
+      tabIndex={0}
+      aria-label={`Sign in as ${candidate.name}`}
+      onClick={onSelect}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      {brokenAvatar ? (
+        <div className="partner-panel-fallback">
+          <Heart fill="currentColor" />
+        </div>
+      ) : (
+        <img className="partner-panel-photo" src={avatarUrl} alt={candidate.name} onError={onImgError} />
+      )}
+      <div className="partner-panel-scrim">
+        <span className="partner-panel-name">{candidate.name}</span>
+      </div>
+      <label
+        className="avatar-upload-button"
+        onClick={(event) => event.stopPropagation()}
+        aria-label={`Upload a photo for ${candidate.name}`}
+      >
+        {uploading ? <LoaderCircle className="spin" size={16} /> : <Camera size={16} />}
+        <input
+          type="file"
+          accept="image/*"
+          hidden
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => onUpload(event.target.files?.[0])}
+        />
+      </label>
+    </div>
   );
 }
 
