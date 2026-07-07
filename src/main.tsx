@@ -971,8 +971,8 @@ function TimelineView({
       </div>
       <div className="polaroid-intro">
         <span className="section-kicker">Pinned to the string</span>
-        <h2>The String Between Us</h2>
-        <p>Scroll on — each polaroid drops into place like we pinned it there ourselves.</p>
+        <h2>Every Moment, Pinned</h2>
+        <p>Keep scrolling — each memory clips into place, one by one, right where it belongs.</p>
       </div>
       {items.length ? (
         items.map((item, index) => (
