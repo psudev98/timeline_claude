@@ -34,10 +34,15 @@ type MilestoneRow = {
   unlock_at: string | null;
 };
 
-async function signedUrl(path: string | null) {
-  if (!path) return '';
-  const { data } = await supabase.storage.from('photos').createSignedUrl(path, 60 * 60);
-  return data?.signedUrl || '';
+async function signAllUrls(paths: Array<string | null | undefined>): Promise<Map<string, string>> {
+  const unique = Array.from(new Set(paths.filter((path): path is string => !!path)));
+  const map = new Map<string, string>();
+  if (!unique.length) return map;
+  const { data } = await supabase.storage.from('photos').createSignedUrls(unique, 60 * 60);
+  (data || []).forEach((entry) => {
+    if (entry.path && entry.signedUrl) map.set(entry.path, entry.signedUrl);
+  });
+  return map;
 }
 
 function isOptionalSetupError(error: unknown) {
@@ -117,16 +122,26 @@ export async function loadRomanceData() {
   ].find(Boolean);
   if (firstError) throw firstError;
 
-  const media: MediaItem[] = await Promise.all(
-    (!mediaResult.error ? mediaResult.data || [] : []).map(async (row) => ({
-      id: row.id,
-      milestoneId: row.milestone_id,
-      storagePath: row.storage_path,
-      mediaType: row.media_type,
-      sortOrder: row.sort_order,
-      signedUrl: await signedUrl(row.storage_path),
-    })),
-  );
+  const mediaRows = !mediaResult.error ? mediaResult.data || [] : [];
+  const milestoneRows = (milestonesResult.data || []) as MilestoneRow[];
+
+  // Sign every photo/voice path in a single batched request instead of one
+  // network round-trip per file - this is the difference between ~2 requests
+  // and dozens once there are more than a handful of memories, which matters
+  // a lot more on a mobile network than on a fast desktop connection.
+  const urlMap = await signAllUrls([
+    ...mediaRows.map((row) => row.storage_path),
+    ...milestoneRows.flatMap((row) => [row.photo_path, row.voice_path]),
+  ]);
+
+  const media: MediaItem[] = mediaRows.map((row) => ({
+    id: row.id,
+    milestoneId: row.milestone_id,
+    storagePath: row.storage_path,
+    mediaType: row.media_type,
+    sortOrder: row.sort_order,
+    signedUrl: urlMap.get(row.storage_path) || '',
+  }));
 
   const reactions: Reaction[] = (!reactionsResult.error ? reactionsResult.data || [] : []).map((row) => ({
     id: row.id,
@@ -145,35 +160,33 @@ export async function loadRomanceData() {
     createdAt: row.created_at,
   }));
 
-  const milestones: Milestone[] = await Promise.all(
-    ((milestonesResult.data || []) as MilestoneRow[]).map(async (row) => {
-      const rowMedia = media.filter((item) => item.milestoneId === row.id);
-      const legacyUrl = (await signedUrl(row.photo_path)) || row.image_url || fallbackImage;
-      return {
-        id: row.id,
-        userId: row.user_id,
-        date: row.date,
-        title: row.title,
-        description: row.description,
-        imageUrl: rowMedia.find((item) => item.mediaType === 'image')?.signedUrl || legacyUrl,
-        photoPath: row.photo_path,
-        addedBy: row.added_by,
-        isFavorite: row.is_favorite || false,
-        moodTags: row.mood_tags || [],
-        locationName: row.location_name || '',
-        latitude: row.latitude,
-        longitude: row.longitude,
-        songUrl: row.song_url || '',
-        voicePath: row.voice_path,
-        voiceUrl: await signedUrl(row.voice_path),
-        unlockPhrase: row.unlock_phrase || '',
-        unlockAt: row.unlock_at,
-        media: rowMedia,
-        reactions: reactions.filter((item) => item.milestoneId === row.id),
-        comments: comments.filter((item) => item.milestoneId === row.id),
-      };
-    }),
-  );
+  const milestones: Milestone[] = milestoneRows.map((row) => {
+    const rowMedia = media.filter((item) => item.milestoneId === row.id);
+    const legacyUrl = (row.photo_path && urlMap.get(row.photo_path)) || row.image_url || fallbackImage;
+    return {
+      id: row.id,
+      userId: row.user_id,
+      date: row.date,
+      title: row.title,
+      description: row.description,
+      imageUrl: rowMedia.find((item) => item.mediaType === 'image')?.signedUrl || legacyUrl,
+      photoPath: row.photo_path,
+      addedBy: row.added_by,
+      isFavorite: row.is_favorite || false,
+      moodTags: row.mood_tags || [],
+      locationName: row.location_name || '',
+      latitude: row.latitude,
+      longitude: row.longitude,
+      songUrl: row.song_url || '',
+      voicePath: row.voice_path,
+      voiceUrl: (row.voice_path && urlMap.get(row.voice_path)) || '',
+      unlockPhrase: row.unlock_phrase || '',
+      unlockAt: row.unlock_at,
+      media: rowMedia,
+      reactions: reactions.filter((item) => item.milestoneId === row.id),
+      comments: comments.filter((item) => item.milestoneId === row.id),
+    };
+  });
 
   const letters: LoveLetter[] = (!lettersResult.error ? lettersResult.data || [] : []).map((row) => ({
     id: row.id,

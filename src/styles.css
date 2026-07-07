@@ -2241,6 +2241,36 @@ select {
     top: 8px;
     width: calc(100% - 16px);
     gap: 5px;
+    /* backdrop-filter on a fixed header is a well-known mobile GPU cost since
+       it re-blurs everything scrolling underneath in real time; swap it for a
+       cheaper, more opaque solid background on small/mobile viewports. */
+    background: rgba(41, 27, 26, 0.86);
+    backdrop-filter: none;
+  }
+
+  .photo-count-badge {
+    background: rgba(41, 22, 22, 0.82);
+    backdrop-filter: none;
+  }
+
+  /* These continuous decorative loops (a position:fixed blurred orb that's on
+     screen through all Timeline scrolling, a full-page gradient shift, and a
+     per-photo-stack breathing effect that multiplies with every multi-photo
+     memory) each add compositor work every frame - fine on desktop GPUs, but
+     they stack up on weaker mobile GPUs. Disabling them here keeps the visual
+     mostly intact while cutting continuous background work during scroll. */
+  .polaroid-timeline-section::before,
+  .polaroid-timeline-section::after {
+    animation: none;
+    display: none;
+  }
+
+  .auth-page::before {
+    animation: none;
+  }
+
+  .stack-layer.depth-0 {
+    animation: none;
   }
 
   .profile-chip {
