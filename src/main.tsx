@@ -2,17 +2,21 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Session } from '@supabase/supabase-js';
 import {
+  BarChart3,
   Camera,
   CalendarDays,
   CalendarHeart,
   ChevronLeft,
   ChevronRight,
+  CircleCheck,
   Download,
+  Gamepad2,
   Gift,
   Heart,
   ImagePlus,
   Images,
   LayoutGrid,
+  ListChecks,
   ListTree,
   LoaderCircle,
   Lock,
@@ -21,11 +25,13 @@ import {
   Music2,
   Pause,
   Plus,
+  RotateCcw,
   Send,
   Settings2,
   Sparkles,
   Star,
   Trash2,
+  Trophy,
   Unlock,
   UploadCloud,
   Volume2,
@@ -61,9 +67,10 @@ import {
   toggleReaction,
   uploadMemoryFile,
 } from './romanceApi';
-import { ReactionRow } from './ReactionRow';
+import { reactionOptions, ReactionRow } from './ReactionRow';
 import { MemoryPhotoViewer } from './MemoryPhotoViewer';
 import type {
+  BucketListItem,
   LoveLetter,
   Milestone,
   Profile,
@@ -138,6 +145,28 @@ function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
 function pickRoastLine(name: string): string {
   const line = roastPool[Math.floor(Math.random() * roastPool.length)];
   return line.replace(/\{name\}/g, name);
+}
+
+const gameMissPool: string[] = [
+  "Not quite — but points for confidence.",
+  'Wrong guess, right relationship.',
+  "That's a different memory entirely.",
+  'Nice try. The timeline disagrees.',
+  'Close! Or, well, not close at all.',
+  "Ooh, so near... to a totally different date.",
+];
+
+function pickGameMissLine(): string {
+  return gameMissPool[Math.floor(Math.random() * gameMissPool.length)];
+}
+
+function shuffleArray<T>(input: T[]): T[] {
+  const array = [...input];
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
 }
 
 type DraftMemory = {
@@ -230,6 +259,7 @@ function RomanceApp({ session }: { session: Session }) {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [letters, setLetters] = useState<LoveLetter[]>([]);
   const [specialDates, setSpecialDates] = useState<SpecialDate[]>([]);
+  const [bucketListItems, setBucketListItems] = useState<BucketListItem[]>([]);
   const [profile, setProfile] = useState<Profile>(() => profileFromSession(session));
   const [view, setView] = useState<ViewName>('timeline');
   const [theme, setTheme] = useState<ThemeName>(
@@ -238,7 +268,7 @@ function RomanceApp({ session }: { session: Session }) {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('');
   const [toast, setToast] = useState('');
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [letterOpen, setLetterOpen] = useState(false);
   const [burst, setBurst] = useState(0);
@@ -266,6 +296,7 @@ function RomanceApp({ session }: { session: Session }) {
       setMilestones(data.milestones);
       setLetters(data.letters);
       setSpecialDates(data.specialDates);
+      setBucketListItems(data.bucketListItems);
       setStatus('');
     } catch (error) {
       setStatus(
@@ -302,6 +333,9 @@ function RomanceApp({ session }: { session: Session }) {
         refresh(true),
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'special_dates' }, () =>
+        refresh(true),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bucket_list_items' }, () =>
         refresh(true),
       )
       .subscribe();
@@ -455,7 +489,7 @@ function RomanceApp({ session }: { session: Session }) {
         }
       }
 
-      setAddOpen(false);
+      setAddOpen(null);
       setBurst((value) => value + 1);
       if (mediaFailure && photoPaths.length > 1) {
         setStatus(
@@ -598,6 +632,36 @@ function RomanceApp({ session }: { session: Session }) {
     }
   }
 
+  async function addBucketListItem(input: { title: string; description: string }) {
+    const { error } = await supabase.from('bucket_list_items').insert({
+      title: input.title.trim(),
+      description: input.description.trim() || null,
+      created_by: session.user.id,
+    });
+    if (error) setStatus(error.message);
+    else {
+      setToast('Added to the someday list');
+      refresh(true);
+    }
+  }
+
+  async function toggleBucketListComplete(item: BucketListItem) {
+    const nextCompleted = !item.isCompleted;
+    const { error } = await supabase
+      .from('bucket_list_items')
+      .update({
+        is_completed: nextCompleted,
+        completed_at: nextCompleted ? new Date().toISOString() : null,
+      })
+      .eq('id', item.id);
+    if (error) setStatus(error.message);
+    else refresh(true);
+  }
+
+  function convertBucketItemToMemory(title: string) {
+    setAddOpen(title);
+  }
+
   return (
     <main className={`app-shell theme-${theme}`}>
       <FloatingHearts keySeed={burst} celebration={isSpecialDay} />
@@ -634,6 +698,15 @@ function RomanceApp({ session }: { session: Session }) {
           </ViewButton>
           <ViewButton active={view === 'letters'} label="Letters" onClick={() => switchView('letters')}>
             <Gift size={18} />
+          </ViewButton>
+          <ViewButton active={view === 'someday'} label="Someday" onClick={() => switchView('someday')}>
+            <ListChecks size={18} />
+          </ViewButton>
+          <ViewButton active={view === 'stats'} label="Stats" onClick={() => switchView('stats')}>
+            <BarChart3 size={18} />
+          </ViewButton>
+          <ViewButton active={view === 'game'} label="Play" onClick={() => switchView('game')}>
+            <Gamepad2 size={18} />
           </ViewButton>
         </nav>
         <div className="top-actions">
@@ -763,6 +836,16 @@ function RomanceApp({ session }: { session: Session }) {
             {view === 'letters' && (
               <LettersView letters={letters} onAdd={() => setLetterOpen(true)} />
             )}
+            {view === 'someday' && (
+              <SomedayView
+                items={bucketListItems}
+                onAdd={addBucketListItem}
+                onToggle={toggleBucketListComplete}
+                onConvertToMemory={convertBucketItemToMemory}
+              />
+            )}
+            {view === 'stats' && <StatsView items={sorted} elapsed={elapsed} />}
+            {view === 'game' && <GameView items={sorted} />}
           </motion.div>
         </AnimatePresence>
       )}
@@ -771,17 +854,18 @@ function RomanceApp({ session }: { session: Session }) {
         className="fab"
         whileHover={{ scale: 1.08, rotate: -4 }}
         whileTap={{ scale: 0.92 }}
-        onClick={() => setAddOpen(true)}
+        onClick={() => setAddOpen('')}
         aria-label="Add a memory"
       >
         <Plus size={24} />
       </motion.button>
 
       <AnimatePresence>
-        {addOpen && (
+        {addOpen !== null && (
           <MemoryComposer
             profile={profile}
-            onClose={() => setAddOpen(false)}
+            initialTitle={addOpen}
+            onClose={() => setAddOpen(null)}
             onSubmit={addMemory}
           />
         )}
@@ -1493,6 +1577,436 @@ function LettersView({
   );
 }
 
+function SomedayView({
+  items,
+  onAdd,
+  onToggle,
+  onConvertToMemory,
+}: {
+  items: BucketListItem[];
+  onAdd: (input: { title: string; description: string }) => void;
+  onToggle: (item: BucketListItem) => void;
+  onConvertToMemory: (title: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [pendingConvert, setPendingConvert] = useState<BucketListItem | null>(null);
+  const prefersReducedMotion = useReducedMotion();
+
+  const pending = items.filter((item) => !item.isCompleted);
+  const completed = items.filter((item) => item.isCompleted);
+
+  function handleToggle(item: BucketListItem) {
+    onToggle(item);
+    if (!item.isCompleted) setPendingConvert(item);
+    else if (pendingConvert?.id === item.id) setPendingConvert(null);
+  }
+
+  return (
+    <section className="alternate-view someday-view">
+      <div className="view-heading">
+        <div>
+          <span className="section-kicker">For us, eventually</span>
+          <h2>The Someday List</h2>
+        </div>
+        <button className="secondary-button" onClick={() => setOpen((value) => !value)}>
+          <Plus size={17} />
+          Add a someday
+        </button>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.form
+            className="inline-form someday-form"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              onAdd({ title, description });
+              setTitle('');
+              setDescription('');
+              setOpen(false);
+            }}
+          >
+            <input
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Something we should do together"
+            />
+            <input
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="A little more detail (optional)"
+            />
+            <button type="submit">
+              <Plus size={17} />
+            </button>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {pendingConvert && (
+          <motion.div
+            className="live-toast convert-banner"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <Sparkles size={17} />
+            <span>Turn &ldquo;{pendingConvert.title}&rdquo; into a memory?</span>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                onConvertToMemory(pendingConvert.title);
+                setPendingConvert(null);
+              }}
+            >
+              Yes
+            </button>
+            <button className="secondary-button" onClick={() => setPendingConvert(null)}>
+              Not now
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {!items.length ? (
+        <EmptyState text="Nothing on the someday list yet — what do you want to do together next?" />
+      ) : (
+        <>
+          <div className="someday-list">
+            {pending.map((item, index) => (
+              <SomedayCard
+                key={item.id}
+                item={item}
+                index={index}
+                onToggle={() => handleToggle(item)}
+                reducedMotion={prefersReducedMotion}
+              />
+            ))}
+            {!pending.length && <p className="quiet-copy">Every someday has already happened. Add a new one.</p>}
+          </div>
+          {completed.length > 0 && (
+            <div className="someday-list someday-completed">
+              <span className="section-kicker">Already lived</span>
+              {completed.map((item, index) => (
+                <SomedayCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  onToggle={() => handleToggle(item)}
+                  reducedMotion={prefersReducedMotion}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function SomedayCard({
+  item,
+  index,
+  onToggle,
+  reducedMotion,
+}: {
+  item: BucketListItem;
+  index: number;
+  onToggle: () => void;
+  reducedMotion: boolean | null;
+}) {
+  return (
+    <motion.div
+      className={`someday-card ${item.isCompleted ? 'completed' : ''}`}
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ amount: 0.4, once: true }}
+      transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52, delay: index * 0.04 }}
+    >
+      <motion.button
+        className={`someday-toggle ${item.isCompleted ? 'active' : ''}`}
+        onClick={onToggle}
+        aria-label={item.isCompleted ? 'Mark as not done' : 'Mark as done'}
+        whileTap={reducedMotion ? undefined : { scale: 0.86 }}
+      >
+        <CircleCheck size={22} fill={item.isCompleted ? 'currentColor' : 'none'} />
+      </motion.button>
+      <div>
+        <strong>{item.title}</strong>
+        {item.description && <p>{item.description}</p>}
+      </div>
+    </motion.div>
+  );
+}
+
+function StatTile({ value, label, caption }: { value: React.ReactNode; label: string; caption: string }) {
+  return (
+    <motion.div
+      className="stat-tile"
+      initial={{ opacity: 0, y: 16, scale: 0.94 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1 }}
+      viewport={{ amount: 0.4, once: true }}
+      transition={{ type: 'spring', stiffness: 130, damping: 11, bounce: 0.52 }}
+    >
+      <span>{value}</span>
+      <strong>{label}</strong>
+      <p>{caption}</p>
+    </motion.div>
+  );
+}
+
+function StatsView({
+  items,
+  elapsed,
+}: {
+  items: Milestone[];
+  elapsed: { days: number; hours: number; minutes: number; seconds: number };
+}) {
+  const stats = useMemo(() => {
+    const totalMemories = items.length;
+
+    const monthCounts = new Map<string, number>();
+    items.forEach((item) => {
+      const key = format(parseISO(item.date), 'MMMM');
+      monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
+    });
+    const busiestMonth = [...monthCounts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+    const reactionCounts = new Map<ReactionKind, number>();
+    items.forEach((item) =>
+      item.reactions.forEach((reaction) => {
+        reactionCounts.set(reaction.reaction, (reactionCounts.get(reaction.reaction) || 0) + 1);
+      }),
+    );
+    const topReaction = [...reactionCounts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+    const topReactionLabel = topReaction
+      ? reactionOptions.find((option) => option.kind === topReaction[0])?.label || topReaction[0]
+      : null;
+
+    let longestGap: { days: number; from: string; to: string } | null = null;
+    for (let index = 1; index < items.length; index += 1) {
+      const gap = differenceInCalendarDays(parseISO(items[index].date), parseISO(items[index - 1].date));
+      if (!longestGap || gap > longestGap.days) {
+        longestGap = { days: gap, from: items[index - 1].title, to: items[index].title };
+      }
+    }
+
+    const moodCounts = new Map<string, number>();
+    items.forEach((item) => item.moodTags.forEach((tag) => moodCounts.set(tag, (moodCounts.get(tag) || 0) + 1)));
+    const topMood = [...moodCounts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+    const favoriteCount = items.filter((item) => item.isFavorite).length;
+
+    const addedByCounts = new Map<string, number>();
+    items.forEach((item) => addedByCounts.set(item.addedBy, (addedByCounts.get(item.addedBy) || 0) + 1));
+    const topAdder = [...addedByCounts.entries()].sort((a, b) => b[1] - a[1])[0] || null;
+
+    return { totalMemories, busiestMonth, topReactionLabel, topReactionCount: topReaction?.[1] || 0, longestGap, topMood, favoriteCount, topAdder };
+  }, [items]);
+
+  return (
+    <section className="alternate-view stats-view">
+      <div className="view-heading">
+        <div>
+          <span className="section-kicker">The numbers behind us</span>
+          <h2>Us in Numbers</h2>
+        </div>
+        <BarChart3 />
+      </div>
+      <div className="stats-grid">
+        <StatTile value={elapsed.days} label="Days together" caption="And counting, every single second." />
+        <StatTile value={stats.totalMemories} label="Memories saved" caption="Every one worth keeping." />
+        <StatTile
+          value={stats.busiestMonth ? stats.busiestMonth[0] : '—'}
+          label="Busiest month"
+          caption={stats.busiestMonth ? `${stats.busiestMonth[1]} memories happened here.` : 'Not enough data yet.'}
+        />
+        <StatTile
+          value={stats.topReactionLabel || '—'}
+          label="Most-used reaction"
+          caption={stats.topReactionLabel ? `Dropped ${stats.topReactionCount} times.` : 'No reactions yet — go tap something.'}
+        />
+        <StatTile
+          value={stats.longestGap ? `${stats.longestGap.days}d` : '—'}
+          label="Longest gap"
+          caption={
+            stats.longestGap
+              ? `Between "${stats.longestGap.from}" and "${stats.longestGap.to}".`
+              : 'Not enough data yet.'
+          }
+        />
+        <StatTile
+          value={stats.topMood ? stats.topMood[0] : '—'}
+          label="Signature mood"
+          caption={stats.topMood ? `Tagged ${stats.topMood[1]} times.` : 'Not enough data yet.'}
+        />
+        <StatTile value={stats.favoriteCount} label="Favorites pinned" caption="The ones we keep coming back to." />
+        <StatTile
+          value={stats.topAdder ? stats.topAdder[0] : '—'}
+          label="Top contributor"
+          caption={stats.topAdder ? `Added ${stats.topAdder[1]} memories.` : 'Not enough data yet.'}
+        />
+      </div>
+    </section>
+  );
+}
+
+type GameRound = { milestone: Milestone; options: string[] };
+
+function buildGameRounds(pool: Milestone[]): GameRound[] {
+  const distinctDates = Array.from(new Set(pool.map((item) => item.date)));
+  const picks = shuffleArray(pool).slice(0, Math.min(5, pool.length));
+  return picks.map((milestone) => {
+    const wrongDates = shuffleArray(distinctDates.filter((date) => date !== milestone.date)).slice(
+      0,
+      Math.min(3, distinctDates.length - 1),
+    );
+    return { milestone, options: shuffleArray([milestone.date, ...wrongDates]) };
+  });
+}
+
+function GameView({ items }: { items: Milestone[] }) {
+  const distinctDateMilestones = useMemo(() => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.date)) return false;
+      seen.add(item.date);
+      return true;
+    });
+  }, [items]);
+  const [gameKey, setGameKey] = useState(0);
+
+  return (
+    <section className="alternate-view game-view">
+      <div className="view-heading">
+        <div>
+          <span className="section-kicker">Test your memory</span>
+          <h2>Guess the Memory</h2>
+        </div>
+        <Gamepad2 />
+      </div>
+      {distinctDateMilestones.length < 3 ? (
+        <EmptyState text="We need a few more memories on the string before we can play with them." />
+      ) : (
+        <GameRounds
+          key={gameKey}
+          pool={distinctDateMilestones}
+          onReplay={() => setGameKey((value) => value + 1)}
+        />
+      )}
+    </section>
+  );
+}
+
+function GameRounds({ pool, onReplay }: { pool: Milestone[]; onReplay: () => void }) {
+  const prefersReducedMotion = useReducedMotion();
+  const [rounds] = useState<GameRound[]>(() => buildGameRounds(pool));
+  const [roundIndex, setRoundIndex] = useState(0);
+  const [score, setScore] = useState(0);
+  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [missLine, setMissLine] = useState('');
+
+  const finished = roundIndex >= rounds.length;
+
+  function chooseOption(option: string, round: GameRound) {
+    if (feedback) return;
+    const isCorrect = option === round.milestone.date;
+    setSelected(option);
+    setFeedback(isCorrect ? 'correct' : 'wrong');
+    if (isCorrect) setScore((value) => value + 1);
+    else setMissLine(pickGameMissLine());
+    window.setTimeout(() => {
+      setFeedback(null);
+      setSelected(null);
+      setRoundIndex((value) => value + 1);
+    }, 850);
+  }
+
+  if (finished) {
+    const tier =
+      score === rounds.length
+        ? { caption: "Perfect score — you clearly weren't just scrolling past these.", celebrate: true }
+        : score >= Math.ceil(rounds.length * 0.6)
+        ? { caption: 'Pretty good. Someone was paying attention.', celebrate: false }
+        : { caption: "A rough round, but that's what the timeline is for — go relive it.", celebrate: false };
+    return (
+      <motion.div
+        className="game-final"
+        initial={{ opacity: 0, scale: 0.9, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 14, bounce: 0.5 }}
+      >
+        {tier.celebrate && <FloatingHearts keySeed={score} celebration />}
+        <Trophy size={40} />
+        <strong>
+          {score} / {rounds.length}
+        </strong>
+        <p>{tier.caption}</p>
+        <button className="secondary-button" onClick={onReplay}>
+          <RotateCcw size={17} />
+          Play again
+        </button>
+      </motion.div>
+    );
+  }
+
+  const round = rounds[roundIndex];
+  const photo = round.milestone.media.find((item) => item.mediaType === 'image')?.signedUrl || round.milestone.imageUrl;
+
+  return (
+    <div className="game-board">
+      <div className="game-progress">
+        Round {roundIndex + 1} of {rounds.length} · Score {score}
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={roundIndex}
+          className="game-round"
+          initial={{ opacity: 0, x: 24 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -24 }}
+          transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
+        >
+          <div className="game-photo">
+            <img src={photo} alt="" loading="lazy" />
+          </div>
+          <h3>When was this?</h3>
+          <p className="quiet-copy">{round.milestone.title}</p>
+          <div className="game-options">
+            {round.options.map((option) => {
+              const isSelected = selected === option;
+              const isCorrectOption = option === round.milestone.date;
+              const showState = feedback && (isSelected || isCorrectOption);
+              return (
+                <motion.button
+                  key={option}
+                  className={`game-option ${showState ? (isCorrectOption ? 'correct' : 'wrong') : ''}`}
+                  onClick={() => chooseOption(option, round)}
+                  disabled={!!feedback}
+                  whileHover={prefersReducedMotion || feedback ? undefined : { scale: 1.03 }}
+                  whileTap={prefersReducedMotion || feedback ? undefined : { scale: 0.96 }}
+                >
+                  {format(parseISO(option), 'MMM d, yyyy')}
+                </motion.button>
+              );
+            })}
+          </div>
+          {feedback === 'wrong' && <p className="game-miss">{missLine}</p>}
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function CountdownBand({
   dates,
   onAdd,
@@ -1563,16 +2077,18 @@ function CountdownBand({
 
 function MemoryComposer({
   profile,
+  initialTitle,
   onClose,
   onSubmit,
 }: {
   profile: Profile;
+  initialTitle?: string | null;
   onClose: () => void;
   onSubmit: (draft: DraftMemory) => Promise<void>;
 }) {
   const [draft, setDraft] = useState<DraftMemory>({
     date: format(new Date(), 'yyyy-MM-dd'),
-    title: '',
+    title: initialTitle || '',
     description: '',
     addedBy: profile.name,
     photos: [],
