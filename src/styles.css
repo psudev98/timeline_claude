@@ -1927,6 +1927,217 @@ select {
   color: var(--muted);
 }
 
+/* Someday bucket list */
+
+.someday-form {
+  grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto;
+}
+
+.convert-banner {
+  gap: 10px;
+}
+
+.convert-banner span {
+  flex: 1;
+}
+
+.someday-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.someday-completed {
+  margin-top: 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(117, 86, 72, 0.14);
+}
+
+.someday-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(110, 72, 67, 0.14);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  box-shadow: 0 12px 30px rgba(69, 45, 40, 0.08);
+}
+
+.someday-card.completed {
+  opacity: 0.68;
+}
+
+.someday-card.completed strong {
+  text-decoration: line-through;
+  text-decoration-color: var(--accent);
+}
+
+.someday-card strong {
+  display: block;
+  font-size: 1.05rem;
+}
+
+.someday-card p {
+  margin: 2px 0 0;
+  color: var(--muted);
+}
+
+.someday-toggle {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(110, 72, 67, 0.22);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.someday-toggle.active {
+  color: white;
+  border-color: transparent;
+  background: var(--accent);
+}
+
+/* Us in Numbers stats */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.stat-tile {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 250, 244, 0.7);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 40px rgba(31, 20, 18, 0.1);
+}
+
+.stat-tile span {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 900;
+  color: var(--accent);
+}
+
+.stat-tile strong {
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.stat-tile p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* Guess the Memory game */
+
+.game-board {
+  width: min(560px, 100%);
+  margin: 0 auto;
+}
+
+.game-progress {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-weight: 800;
+  text-align: center;
+}
+
+.game-round {
+  display: grid;
+  gap: 12px;
+  text-align: center;
+}
+
+.game-photo {
+  overflow: hidden;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(69, 45, 40, 0.18);
+}
+
+.game-photo img {
+  display: block;
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+}
+
+.game-round h3 {
+  margin: 4px 0 0;
+}
+
+.game-options {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.game-option {
+  padding: 12px 16px;
+  border: 1px solid rgba(110, 72, 67, 0.2);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.game-option.correct {
+  border-color: transparent;
+  color: white;
+  background: var(--mint);
+}
+
+.game-option.wrong {
+  border-color: transparent;
+  color: white;
+  background: var(--coral);
+}
+
+.game-miss {
+  margin-top: 6px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.game-final {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(440px, 100%);
+  margin: 40px auto 0;
+  padding: 40px 24px;
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface-strong);
+  box-shadow: 0 22px 60px rgba(69, 45, 40, 0.16);
+  text-align: center;
+}
+
+.game-final svg {
+  color: var(--gold);
+}
+
+.game-final strong {
+  font-size: 2.4rem;
+}
+
+.game-final p {
+  color: var(--muted);
+}
+
 /* Scrapbook Flip timeline */
 
 .scrapbook-section {
@@ -2419,6 +2630,14 @@ select {
 
   .letter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .someday-form {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .form-grid {
@@ -3647,7 +3866,11 @@ select {
   .feature-band,
   .favorites-band,
   .calendar-day,
-  .calendar-month-heading {
+  .calendar-month-heading,
+  .someday-card,
+  .stat-tile,
+  .game-round,
+  .game-final {
     opacity: 1 !important;
     transform: none !important;
   }

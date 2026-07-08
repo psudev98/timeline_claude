@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import type {
+  BucketListItem,
   Comment,
   LoveLetter,
   MediaItem,
@@ -103,6 +104,7 @@ export async function loadRomanceData() {
     commentsResult,
     lettersResult,
     datesResult,
+    bucketResult,
   ] = await Promise.all([
     supabase.from('milestones').select('*').order('date', { ascending: true }),
     supabase.from('milestone_media').select('*').order('sort_order'),
@@ -110,6 +112,7 @@ export async function loadRomanceData() {
     supabase.from('comments').select('*').order('created_at'),
     supabase.from('love_letters').select('*').order('created_at', { ascending: false }),
     supabase.from('special_dates').select('*').order('event_date'),
+    supabase.from('bucket_list_items').select('*').order('created_at', { ascending: false }),
   ]);
 
   const firstError = [
@@ -119,6 +122,7 @@ export async function loadRomanceData() {
     commentsResult.error && !isOptionalSetupError(commentsResult.error) ? commentsResult.error : null,
     lettersResult.error && !isOptionalSetupError(lettersResult.error) ? lettersResult.error : null,
     datesResult.error && !isOptionalSetupError(datesResult.error) ? datesResult.error : null,
+    bucketResult.error && !isOptionalSetupError(bucketResult.error) ? bucketResult.error : null,
   ].find(Boolean);
   if (firstError) throw firstError;
 
@@ -205,7 +209,17 @@ export async function loadRomanceData() {
     recurringYearly: row.recurring_yearly,
   }));
 
-  return { milestones, letters, specialDates };
+  const bucketListItems: BucketListItem[] = (!bucketResult.error ? bucketResult.data || [] : []).map((row) => ({
+    id: row.id,
+    title: row.title,
+    description: row.description || '',
+    isCompleted: row.is_completed,
+    completedAt: row.completed_at,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  }));
+
+  return { milestones, letters, specialDates, bucketListItems };
 }
 
 export async function toggleReaction(

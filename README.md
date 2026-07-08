@@ -21,6 +21,9 @@ A private shared space for two people, built with React, Framer Motion, Supabase
 - Mobile-first upload form
 - Print/PDF keepsake export
 - Scrapbook Flip UI with 3D page spreads, paper texture, tape, ticket stubs, envelope/secret reveals, and parallax-style decorative motion
+- "Someday" bucket list with one-tap conversion of a completed item into a real memory
+- "Us in Numbers" stats page
+- "Guess the Memory" multiple-choice date game
 
 ## 1. Upgrade Supabase
 
@@ -49,6 +52,14 @@ supabase-avatar-storage.sql
 ```
 
 This creates a separate, **public** `avatars` bucket used only for the two profile photos shown on the login screen (so they can be uploaded and viewed before anyone signs in). See the comments in that file for the security trade-off this implies.
+
+Then also run:
+
+```txt
+supabase-bucket-list.sql
+```
+
+This creates the `bucket_list_items` table used by the "Someday" bucket-list board.
 
 If the site says it cannot add a memory, check the message shown in the pink status box. The most common causes are:
 

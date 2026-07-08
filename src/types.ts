@@ -1,5 +1,5 @@
 export type ThemeName = 'blush' | 'moonlight' | 'golden-hour' | 'rainy-day';
-export type ViewName = 'timeline' | 'calendar' | 'polaroids' | 'letters';
+export type ViewName = 'timeline' | 'calendar' | 'polaroids' | 'letters' | 'someday' | 'stats' | 'game';
 export type ReactionKind = 'heart' | 'sparkle' | 'smile' | 'favorite';
 
 export type Profile = {
@@ -72,4 +72,14 @@ export type SpecialDate = {
   eventDate: string;
   kind: string;
   recurringYearly: boolean;
+};
+
+export type BucketListItem = {
+  id: string;
+  title: string;
+  description: string;
+  isCompleted: boolean;
+  completedAt: string | null;
+  createdBy: string | null;
+  createdAt: string;
 };
