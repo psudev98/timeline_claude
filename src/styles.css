@@ -2597,7 +2597,7 @@ select {
   margin-left: auto;
 }
 
-.memory-left .polaroid-card {
+.memory-left .card-tilt-wrapper {
   order: 2;
 }
 
@@ -2856,6 +2856,21 @@ select {
   }
   100% {
     transform: translateX(-50%) skewX(0deg);
+  }
+}
+
+.twine-track.string-ripple .twine-draw {
+  animation: twineGlowPulse 400ms ease-out;
+}
+
+@keyframes twineGlowPulse {
+  0% {
+    stroke: #e9517d;
+    filter: drop-shadow(0 0 16px rgba(233, 81, 125, 0.85)) drop-shadow(0 0 7px rgba(167, 109, 71, 0.25));
+  }
+  100% {
+    stroke: #a76d47;
+    filter: drop-shadow(0 0 7px rgba(167, 109, 71, 0.25));
   }
 }
 
@@ -3641,7 +3656,7 @@ select {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .memory-left .polaroid-card,
+  .memory-left .card-tilt-wrapper,
   .memory-left .memory-details {
     order: initial;
     text-align: left;
