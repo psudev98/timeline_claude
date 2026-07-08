@@ -39,6 +39,7 @@ import {
   useScroll,
   useSpring,
   useTransform,
+  useVelocity,
 } from 'framer-motion';
 import {
   addDays,
@@ -246,12 +247,17 @@ function RomanceApp({ session }: { session: Session }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const firstLoad = useRef(true);
   const lastActivity = useRef(Date.now());
+  const firedMilestones = useRef<Set<number>>(new Set());
   const { scrollYProgress } = useScroll({
     target: timelineRef,
     offset: ['start center', 'end center'],
   });
   const progress = useSpring(scrollYProgress, { stiffness: 80, damping: 24 });
   const lineHeight = useTransform(progress, [0, 1], ['0%', '100%']);
+  const { scrollY } = useScroll();
+  const scrollVelocity = useVelocity(scrollY);
+  const smoothVelocity = useSpring(scrollVelocity, { stiffness: 300, damping: 30, mass: 0.4 });
+  const scrollTilt = useTransform(smoothVelocity, [-2000, 2000], [-7, 7], { clamp: true });
 
   async function refresh(silent = false) {
     if (!silent) setLoading(true);
@@ -341,7 +347,12 @@ function RomanceApp({ session }: { session: Session }) {
   }, [musicOn]);
 
   useMotionValueEvent(progress, 'change', (latest) => {
-    if (latest > 0.98) setBurst((value) => value + 1);
+    for (const threshold of [0.25, 0.5, 0.75, 0.98]) {
+      if (latest > threshold && !firedMilestones.current.has(threshold)) {
+        firedMilestones.current.add(threshold);
+        setBurst((value) => value + 1);
+      }
+    }
   });
 
   const sorted = useMemo(
@@ -738,6 +749,7 @@ function RomanceApp({ session }: { session: Session }) {
                 session={session}
                 lineHeight={lineHeight}
                 lineProgress={progress}
+                scrollTilt={scrollTilt}
                 timelineRef={timelineRef}
                 onDelete={deleteMemory}
                 onDeletePhoto={deletePhoto}
@@ -835,6 +847,7 @@ function TimelineView({
   session,
   lineHeight,
   lineProgress,
+  scrollTilt,
   timelineRef,
   onDelete,
   onDeletePhoto,
@@ -846,6 +859,7 @@ function TimelineView({
   session: Session;
   lineHeight: MotionValue<string>;
   lineProgress: MotionValue<number>;
+  scrollTilt: MotionValue<number>;
   timelineRef: React.RefObject<HTMLDivElement | null>;
   onDelete: (item: Milestone) => void;
   onDeletePhoto: (item: Milestone, mediaId: string, storagePath: string) => void;
@@ -983,6 +997,7 @@ function TimelineView({
             userId={session.user.id}
             isActive={activeId === item.id}
             isPassed={passedIds.has(item.id)}
+            scrollTilt={scrollTilt}
             onDelete={() => onDelete(item)}
             onDeletePhoto={(mediaId, storagePath) => onDeletePhoto(item, mediaId, storagePath)}
             onFavorite={() => onFavorite(item)}
@@ -1030,6 +1045,7 @@ function TimelineCard({
   userId,
   isActive,
   isPassed,
+  scrollTilt,
   onDelete,
   onDeletePhoto,
   onFavorite,
@@ -1043,6 +1059,7 @@ function TimelineCard({
   userId: string;
   isActive: boolean;
   isPassed: boolean;
+  scrollTilt: MotionValue<number>;
   onDelete: () => void;
   onDeletePhoto: (mediaId: string, storagePath: string) => void;
   onFavorite: () => void;
@@ -1123,6 +1140,7 @@ function TimelineCard({
       </motion.div>
       <div className="string-connector" aria-hidden="true" />
 
+      <motion.div className="card-tilt-wrapper" style={{ rotate: prefersReducedMotion ? 0 : scrollTilt }}>
       <motion.div
         ref={cardRef}
         className="polaroid-card"
@@ -1182,6 +1200,7 @@ function TimelineCard({
           <span>{format(parseISO(item.date), 'MMM d, yyyy')}</span>
           <strong>{item.title}</strong>
         </div>
+      </motion.div>
       </motion.div>
 
       <div className="memory-details">

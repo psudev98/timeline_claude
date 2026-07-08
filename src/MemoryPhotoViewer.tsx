@@ -1,13 +1,19 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { motion, useReducedMotion, type Transition } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import { Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
 import { ReactionRow } from './ReactionRow';
 import type { Milestone, ReactionKind } from './types';
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
+
+const SLIDE_SIZE = 220;
+const ROTATION_STEP = 12;
+const VERTICAL_STEP = 44;
+const INACTIVE_SCALE = 0.72;
+const CAROUSEL_TRANSITION: Transition = { type: 'spring', bounce: 0.16, duration: 0.85 };
 
 export function MemoryPhotoViewer({
   item,
@@ -26,18 +32,11 @@ export function MemoryPhotoViewer({
   const [index, setIndex] = useState(0);
   const [popped, setPopped] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const rafId = useRef(0);
-  const indexRef = useRef(0);
+  const prefersReducedMotion = useReducedMotion();
+  const carouselTransition: Transition = prefersReducedMotion ? { duration: 0 } : CAROUSEL_TRANSITION;
 
   function goTo(next: number) {
-    const clamped = clamp(next, 0, photos.length - 1);
-    slideRefs.current[clamped]?.scrollIntoView({
-      behavior: 'smooth',
-      inline: 'center',
-      block: 'nearest',
-    });
+    setIndex(clamp(next, 0, photos.length - 1));
   }
 
   useEffect(() => {
@@ -67,58 +66,12 @@ export function MemoryPhotoViewer({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [index, photos.length]);
 
-  const updateSlideStyles = useCallback(() => {
-    rafId.current = 0;
-    const track = trackRef.current;
-    if (!track) return;
-    const trackRect = track.getBoundingClientRect();
-    const center = trackRect.left + trackRect.width / 2;
-    let closestIndex = indexRef.current;
-    let closestDistance = Infinity;
-
-    slideRefs.current.forEach((slide, i) => {
-      if (!slide) return;
-      const rect = slide.getBoundingClientRect();
-      const slideCenter = rect.left + rect.width / 2;
-      const rawDistance = (slideCenter - center) / (rect.width / 2);
-      const distance = clamp(rawDistance, -1, 1);
-      const abs = Math.abs(distance);
-      const scale = 1 - abs * 0.12;
-      const brightness = 1 - abs * 0.35;
-      const blur = abs * 2;
-      slide.style.transform = `scale(${scale})`;
-      slide.style.filter = `brightness(${brightness}) blur(${blur}px)`;
-      const centerDistance = Math.abs(slideCenter - center);
-      if (centerDistance < closestDistance) {
-        closestDistance = centerDistance;
-        closestIndex = i;
-      }
-    });
-
-    if (closestIndex !== indexRef.current) {
-      indexRef.current = closestIndex;
-      setIndex(closestIndex);
-    }
-  }, []);
-
-  function onTrackScroll() {
-    if (!rafId.current) rafId.current = window.requestAnimationFrame(updateSlideStyles);
-  }
-
-  function onWheel(event: React.WheelEvent<HTMLDivElement>) {
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.currentTarget.scrollBy({ left: event.deltaY });
-  }
-
-  useEffect(() => {
-    updateSlideStyles();
-    window.addEventListener('resize', updateSlideStyles);
-    return () => window.removeEventListener('resize', updateSlideStyles);
-  }, [updateSlideStyles]);
-
   const currentPhoto = photos[index];
 
   if (!currentPhoto) return null;
+
+  const isPreviousDisabled = index === 0;
+  const isNextDisabled = index === photos.length - 1;
 
   return (
     <motion.div
@@ -148,34 +101,76 @@ export function MemoryPhotoViewer({
           <Trash2 size={17} />
         </button>
 
-        <div className="viewer-viewport">
-          <div className="viewer-track" ref={trackRef} onScroll={onTrackScroll} onWheel={onWheel}>
-            {photos.map((photo, i) => (
-              <div
-                key={photo.id}
-                ref={(el) => {
-                  slideRefs.current[i] = el;
-                }}
-                className={`viewer-slide ${i === index ? 'is-current' : ''}`}
-                onClick={() => {
-                  if (i !== index) goTo(i);
-                }}
-              >
-                <img src={photo.signedUrl} alt={item.title} draggable={false} />
-              </div>
-            ))}
-          </div>
+        <div
+          className="viewer-viewport"
+          role="region"
+          aria-roledescription="carousel"
+          aria-label={`${item.title} photos`}
+        >
+          <motion.div
+            className="viewer-track"
+            animate={{ x: -(index * SLIDE_SIZE + SLIDE_SIZE / 2) }}
+            transition={carouselTransition}
+          >
+            {photos.map((photo, i) => {
+              const isActive = i === index;
+              const distance = i - index;
+              return (
+                <motion.button
+                  type="button"
+                  key={photo.id}
+                  className={`viewer-slide ${isActive ? 'is-current' : ''}`}
+                  style={{ width: SLIDE_SIZE }}
+                  animate={{
+                    rotate: prefersReducedMotion ? 0 : distance * ROTATION_STEP,
+                    scale: isActive ? 1 : INACTIVE_SCALE,
+                    y: prefersReducedMotion ? 0 : distance * VERTICAL_STEP,
+                  }}
+                  transition={carouselTransition}
+                  aria-label={`Show photo ${i + 1}`}
+                  aria-current={isActive ? 'true' : undefined}
+                  onClick={() => {
+                    if (!isActive) goTo(i);
+                  }}
+                >
+                  <img src={photo.signedUrl} alt={item.title} draggable={false} />
+                </motion.button>
+              );
+            })}
+          </motion.div>
         </div>
 
-        <div className="viewer-dots">
-          {photos.map((photo, i) => (
-            <button
-              key={photo.id}
-              className={`viewer-dot ${i === index ? 'active' : ''} ${i === index && popped ? 'popped' : ''}`}
-              onClick={() => goTo(i)}
-              aria-label={`Go to photo ${i + 1}`}
-            />
-          ))}
+        <div className="viewer-controls">
+          <button
+            type="button"
+            className="viewer-nav"
+            disabled={isPreviousDisabled}
+            onClick={() => goTo(index - 1)}
+            aria-label="Show previous photo"
+          >
+            <ChevronLeft size={18} />
+          </button>
+
+          <div className="viewer-dots">
+            {photos.map((photo, i) => (
+              <button
+                key={photo.id}
+                className={`viewer-dot ${i === index ? 'active' : ''} ${i === index && popped ? 'popped' : ''}`}
+                onClick={() => goTo(i)}
+                aria-label={`Go to photo ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className="viewer-nav"
+            disabled={isNextDisabled}
+            onClick={() => goTo(index + 1)}
+            aria-label="Show next photo"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
 
         <div className={`viewer-details ${detailsVisible ? 'is-visible' : ''}`}>
