@@ -2917,6 +2917,20 @@ select {
   transform: translateX(5px) rotate(2deg);
 }
 
+.memory-stack-frame {
+  transition: transform 320ms ease, opacity 320ms ease;
+  transform-origin: top center;
+}
+
+.memory-stack-frame.is-passed {
+  transform: scale(0.94) translateY(-6px);
+  opacity: 0.82;
+}
+
+.memory-stack-frame.is-active {
+  transform: scale(1.015);
+}
+
 .pinned-memory.is-exiting {
   pointer-events: none;
   animation: cardDeleteExit 450ms ease forwards;

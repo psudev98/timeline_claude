@@ -990,22 +990,26 @@ function TimelineView({
       </div>
       {items.length ? (
         items.map((item, index) => (
-          <TimelineCard
+          <div
             key={item.id}
-            item={item}
-            isEven={index % 2 === 0}
-            userId={session.user.id}
-            isActive={activeId === item.id}
-            isPassed={passedIds.has(item.id)}
-            scrollTilt={scrollTilt}
-            onDelete={() => onDelete(item)}
-            onDeletePhoto={(mediaId, storagePath) => onDeletePhoto(item, mediaId, storagePath)}
-            onFavorite={() => onFavorite(item)}
-            onReact={(kind) => onReact(item, kind)}
-            onComment={(body) => onComment(item, body)}
-            onOpen={() => openItem(item)}
-            onLanded={triggerStringRipple}
-          />
+            className={`memory-stack-frame ${activeId === item.id ? 'is-active' : ''} ${passedIds.has(item.id) ? 'is-passed' : ''}`}
+          >
+            <TimelineCard
+              item={item}
+              isEven={index % 2 === 0}
+              userId={session.user.id}
+              isActive={activeId === item.id}
+              isPassed={passedIds.has(item.id)}
+              scrollTilt={scrollTilt}
+              onDelete={() => onDelete(item)}
+              onDeletePhoto={(mediaId, storagePath) => onDeletePhoto(item, mediaId, storagePath)}
+              onFavorite={() => onFavorite(item)}
+              onReact={(kind) => onReact(item, kind)}
+              onComment={(body) => onComment(item, body)}
+              onOpen={() => openItem(item)}
+              onLanded={triggerStringRipple}
+            />
+          </div>
         ))
       ) : (
         <div className="empty-polaroid-line">
