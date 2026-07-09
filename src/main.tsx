@@ -10,7 +10,6 @@ import {
   ChevronRight,
   CircleCheck,
   Download,
-  Gamepad2,
   Gift,
   Heart,
   ImagePlus,
@@ -25,13 +24,11 @@ import {
   Music2,
   Pause,
   Plus,
-  RotateCcw,
   Send,
   Settings2,
   Sparkles,
   Star,
   Trash2,
-  Trophy,
   Unlock,
   UploadCloud,
   Volume2,
@@ -145,28 +142,6 @@ function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
 function pickRoastLine(name: string): string {
   const line = roastPool[Math.floor(Math.random() * roastPool.length)];
   return line.replace(/\{name\}/g, name);
-}
-
-const gameMissPool: string[] = [
-  "Not quite — but points for confidence.",
-  'Wrong guess, right relationship.',
-  "That's a different memory entirely.",
-  'Nice try. The timeline disagrees.',
-  'Close! Or, well, not close at all.',
-  "Ooh, so near... to a totally different date.",
-];
-
-function pickGameMissLine(): string {
-  return gameMissPool[Math.floor(Math.random() * gameMissPool.length)];
-}
-
-function shuffleArray<T>(input: T[]): T[] {
-  const array = [...input];
-  for (let i = array.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
 }
 
 type DraftMemory = {
@@ -705,9 +680,6 @@ function RomanceApp({ session }: { session: Session }) {
           <ViewButton active={view === 'stats'} label="Stats" onClick={() => switchView('stats')}>
             <BarChart3 size={18} />
           </ViewButton>
-          <ViewButton active={view === 'game'} label="Play" onClick={() => switchView('game')}>
-            <Gamepad2 size={18} />
-          </ViewButton>
         </nav>
         <div className="top-actions">
           {playlist[0] && (
@@ -845,7 +817,6 @@ function RomanceApp({ session }: { session: Session }) {
               />
             )}
             {view === 'stats' && <StatsView items={sorted} elapsed={elapsed} />}
-            {view === 'game' && <GameView items={sorted} />}
           </motion.div>
         </AnimatePresence>
       )}
@@ -1614,41 +1585,40 @@ function SomedayView({
           <Plus size={17} />
           Add a someday
         </button>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.form
+              className="inline-form someday-form"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
+              onSubmit={(event) => {
+                event.preventDefault();
+                onAdd({ title, description });
+                setTitle('');
+                setDescription('');
+                setOpen(false);
+              }}
+            >
+              <input
+                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Something we should do together"
+              />
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="A little more detail (optional)"
+              />
+              <button type="submit">
+                <Plus size={17} />
+              </button>
+            </motion.form>
+          )}
+        </AnimatePresence>
       </div>
-
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.form
-            className="inline-form someday-form"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.34, 1.56, 0.64, 1] }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              onAdd({ title, description });
-              setTitle('');
-              setDescription('');
-              setOpen(false);
-            }}
-          >
-            <input
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Something we should do together"
-            />
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="A little more detail (optional)"
-            />
-            <button type="submit">
-              <Plus size={17} />
-            </button>
-          </motion.form>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {pendingConvert && (
@@ -1856,154 +1826,6 @@ function StatsView({
         />
       </div>
     </section>
-  );
-}
-
-type GameRound = { milestone: Milestone; options: string[] };
-
-function buildGameRounds(pool: Milestone[]): GameRound[] {
-  const distinctDates = Array.from(new Set(pool.map((item) => item.date)));
-  const picks = shuffleArray(pool).slice(0, Math.min(5, pool.length));
-  return picks.map((milestone) => {
-    const wrongDates = shuffleArray(distinctDates.filter((date) => date !== milestone.date)).slice(
-      0,
-      Math.min(3, distinctDates.length - 1),
-    );
-    return { milestone, options: shuffleArray([milestone.date, ...wrongDates]) };
-  });
-}
-
-function GameView({ items }: { items: Milestone[] }) {
-  const distinctDateMilestones = useMemo(() => {
-    const seen = new Set<string>();
-    return items.filter((item) => {
-      if (seen.has(item.date)) return false;
-      seen.add(item.date);
-      return true;
-    });
-  }, [items]);
-  const [gameKey, setGameKey] = useState(0);
-
-  return (
-    <section className="alternate-view game-view">
-      <div className="view-heading">
-        <div>
-          <span className="section-kicker">Test your memory</span>
-          <h2>Guess the Memory</h2>
-        </div>
-        <Gamepad2 />
-      </div>
-      {distinctDateMilestones.length < 3 ? (
-        <EmptyState text="We need a few more memories on the string before we can play with them." />
-      ) : (
-        <GameRounds
-          key={gameKey}
-          pool={distinctDateMilestones}
-          onReplay={() => setGameKey((value) => value + 1)}
-        />
-      )}
-    </section>
-  );
-}
-
-function GameRounds({ pool, onReplay }: { pool: Milestone[]; onReplay: () => void }) {
-  const prefersReducedMotion = useReducedMotion();
-  const [rounds] = useState<GameRound[]>(() => buildGameRounds(pool));
-  const [roundIndex, setRoundIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [missLine, setMissLine] = useState('');
-
-  const finished = roundIndex >= rounds.length;
-
-  function chooseOption(option: string, round: GameRound) {
-    if (feedback) return;
-    const isCorrect = option === round.milestone.date;
-    setSelected(option);
-    setFeedback(isCorrect ? 'correct' : 'wrong');
-    if (isCorrect) setScore((value) => value + 1);
-    else setMissLine(pickGameMissLine());
-    window.setTimeout(() => {
-      setFeedback(null);
-      setSelected(null);
-      setRoundIndex((value) => value + 1);
-    }, 850);
-  }
-
-  if (finished) {
-    const tier =
-      score === rounds.length
-        ? { caption: "Perfect score — you clearly weren't just scrolling past these.", celebrate: true }
-        : score >= Math.ceil(rounds.length * 0.6)
-        ? { caption: 'Pretty good. Someone was paying attention.', celebrate: false }
-        : { caption: "A rough round, but that's what the timeline is for — go relive it.", celebrate: false };
-    return (
-      <motion.div
-        className="game-final"
-        initial={{ opacity: 0, scale: 0.9, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 14, bounce: 0.5 }}
-      >
-        {tier.celebrate && <FloatingHearts keySeed={score} celebration />}
-        <Trophy size={40} />
-        <strong>
-          {score} / {rounds.length}
-        </strong>
-        <p>{tier.caption}</p>
-        <button className="secondary-button" onClick={onReplay}>
-          <RotateCcw size={17} />
-          Play again
-        </button>
-      </motion.div>
-    );
-  }
-
-  const round = rounds[roundIndex];
-  const photo = round.milestone.media.find((item) => item.mediaType === 'image')?.signedUrl || round.milestone.imageUrl;
-
-  return (
-    <div className="game-board">
-      <div className="game-progress">
-        Round {roundIndex + 1} of {rounds.length} · Score {score}
-      </div>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={roundIndex}
-          className="game-round"
-          initial={{ opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.3, ease: [0.34, 1.56, 0.64, 1] }}
-        >
-          <div className="game-photo">
-            <img src={photo} alt="" loading="lazy" />
-          </div>
-          <h3>When was this?</h3>
-          <p className="quiet-copy">{round.milestone.title}</p>
-          <div className="game-options">
-            {round.options.map((option) => {
-              const isSelected = selected === option;
-              const isCorrectOption = option === round.milestone.date;
-              const showState = feedback && (isSelected || isCorrectOption);
-              return (
-                <motion.button
-                  key={option}
-                  className={`game-option ${showState ? (isCorrectOption ? 'correct' : 'wrong') : ''}`}
-                  onClick={() => chooseOption(option, round)}
-                  disabled={!!feedback}
-                  whileHover={prefersReducedMotion || feedback ? undefined : { scale: 1.03 }}
-                  whileTap={prefersReducedMotion || feedback ? undefined : { scale: 0.96 }}
-                >
-                  {format(parseISO(option), 'MMM d, yyyy')}
-                </motion.button>
-              );
-            })}
-          </div>
-          {feedback === 'wrong' && <p className="game-miss">{missLine}</p>}
-        </motion.div>
-      </AnimatePresence>
-    </div>
   );
 }
 
