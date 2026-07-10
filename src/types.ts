@@ -1,5 +1,5 @@
 export type ThemeName = 'blush' | 'moonlight' | 'golden-hour' | 'rainy-day';
-export type ViewName = 'timeline' | 'calendar' | 'polaroids' | 'letters' | 'someday' | 'stats' | 'game';
+export type ViewName = 'timeline' | 'calendar' | 'polaroids' | 'letters' | 'someday' | 'stats';
 export type ReactionKind = 'heart' | 'sparkle' | 'smile' | 'favorite';
 
 export type Profile = {

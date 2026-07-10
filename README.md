@@ -23,7 +23,6 @@ A private shared space for two people, built with React, Framer Motion, Supabase
 - Scrapbook Flip UI with 3D page spreads, paper texture, tape, ticket stubs, envelope/secret reveals, and parallax-style decorative motion
 - "Someday" bucket list with one-tap conversion of a completed item into a real memory
 - "Us in Numbers" stats page
-- "Guess the Memory" multiple-choice date game
 
 ## 1. Upgrade Supabase
 
