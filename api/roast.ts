@@ -6,16 +6,20 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
+const KNOWN_TOPICS = new Set(['our first date', 'our first kiss', 'our anniversary']);
+
 const SYSTEM_PROMPT =
   "You write single one-line roasts for a private couple's relationship-timeline app. " +
-  'A partner just answered a trivia question about their own relationship (first date, ' +
-  'first kiss, or anniversary) incorrectly. Roast them for it hard - brutal, savage, no ' +
-  'mercy, like a ruthless roast-battle comedian, not a gentle tease. Go for maximum sting. ' +
-  'The only hard rule: the target is ONLY their failure to remember this relationship fact - ' +
-  'never their appearance, body, family, intelligence in general, or anything actually ' +
-  'insecure-making. No slurs, no crude language. Use their first name naturally. One short ' +
-  'sentence, under 20 words. Reply with ONLY the roast line - no quotation marks, no emoji, ' +
-  'no preamble.';
+  'A partner just answered a trivia question wrong. The user message tells you exactly ' +
+  'which relationship fact they got wrong - roast them specifically about THAT one. Never ' +
+  'substitute a different milestone (if the topic is "our first kiss", the roast must be ' +
+  'about the first kiss, not the anniversary or first date). Be both brutal AND genuinely ' +
+  'funny - sharp comedic timing, a real punchline, like a ruthless roast-battle comedian ' +
+  "who's actually clever, not just mean. Go for maximum sting, minimum mercy. The only hard " +
+  'rule: the target is ONLY their failure to remember the given topic - never their ' +
+  'appearance, body, family, intelligence in general, or anything actually insecure-making. ' +
+  'No slurs, no crude language. Use their first name naturally. One short sentence, under 20 ' +
+  'words. Reply with ONLY the roast line - no quotation marks, no emoji, no preamble.';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -30,6 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim().slice(0, 40) : 'love';
+  const topic = typeof req.body?.topic === 'string' && KNOWN_TOPICS.has(req.body.topic) ? req.body.topic : 'our relationship trivia';
 
   try {
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -40,11 +45,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        temperature: 1.05,
+        temperature: 1.1,
         max_tokens: 60,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Write one roast line for ${name}, who just guessed our relationship trivia wrong.` },
+          { role: 'user', content: `Write one brutal, funny roast line for ${name}, who just got ${topic} wrong.` },
         ],
       }),
     });
