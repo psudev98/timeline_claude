@@ -144,6 +144,29 @@ function pickRoastLine(name: string): string {
   return line.replace(/\{name\}/g, name);
 }
 
+// Best-effort upgrade over pickRoastLine - a freshly generated line from
+// /api/roast (Groq) instead of the static pool. Returns null on any failure
+// (missing key, rate limit, network, timeout) so callers can keep showing
+// the static fallback instead of a broken login screen.
+async function fetchRoastLine(name: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 4000);
+    const response = await fetch('/api/roast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+      signal: controller.signal,
+    });
+    window.clearTimeout(timeout);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return typeof data.line === 'string' && data.line.trim() ? data.line.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 type DraftMemory = {
   date: string;
   title: string;
@@ -2190,6 +2213,7 @@ function AuthScreen() {
   const [hoveredId, setHoveredId] = useState<PartnerId | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
+  const roastToken = useRef(0);
 
   useEffect(() => {
     if (window.localStorage.getItem('romance.autoLogoutReason') === 'inactivity') {
@@ -2207,6 +2231,7 @@ function AuthScreen() {
   }
 
   function choosePartner(id: PartnerId) {
+    roastToken.current += 1;
     setSelectedPartner(id);
     setBurst((value) => value + 1);
     setActiveQuestion(pickRandomQuestion());
@@ -2216,6 +2241,7 @@ function AuthScreen() {
   }
 
   function goBack() {
+    roastToken.current += 1;
     setSelectedPartner(null);
     setAnswerDate('');
     setMessage('');
@@ -2313,6 +2339,7 @@ function AuthScreen() {
               style={{ '--partner-color': partner.color } as React.CSSProperties}
               onSubmit={async (event) => {
                 event.preventDefault();
+                roastToken.current += 1;
                 if (!partner.email) {
                   setLeadMessage('');
                   setMessage(
@@ -2335,6 +2362,11 @@ function AuthScreen() {
                   setActiveQuestion((current) => pickRandomQuestion(current.id));
                   setAnswerDate('');
                   triggerShake();
+                  const token = roastToken.current;
+                  const roastName = partner.name;
+                  fetchRoastLine(roastName).then((line) => {
+                    if (line && roastToken.current === token) setLeadMessage(line);
+                  });
                   return;
                 }
                 setLoading(true);

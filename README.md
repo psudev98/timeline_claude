@@ -109,6 +109,16 @@ The `VITE_PARTNER_*_AUTH_SECRET` and `VITE_TRIVIA_*` values follow the same rule
 
 For local development, put the same values in `.env.local`.
 
+### Wrong-guess roasts (optional, needs one more var)
+
+```bash
+GROQ_API_KEY=your_groq_api_key
+```
+
+Get a free key at [console.groq.com](https://console.groq.com) - no credit card needed. Unlike every other var above, **do not prefix this one with `VITE_`**. It's read server-side only, by the Vercel serverless function at `api/roast.ts`, and must never end up in the shipped client JS (a leaked key could be used by anyone to burn the shared free-tier rate limit). When a partner answers the trivia question wrong, the login screen shows a line from the static `roastPool` instantly, then swaps in a freshly LLM-generated one a moment later if Groq responds in time. If `GROQ_API_KEY` isn't set, or the request fails or times out, it just keeps the static line - there's no user-visible error either way.
+
+Local dev note: plain `npm run dev` (Vite) does not serve the `/api` folder, so the roast endpoint will 404 locally and silently fall back to the static pool - to actually exercise `api/roast.ts` locally, run `vercel dev` instead (needs the Vercel CLI and the project linked with `vercel link`).
+
 ## 4. Install and run
 
 ```bash
