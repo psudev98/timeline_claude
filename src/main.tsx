@@ -115,22 +115,31 @@ const triviaQuestions: TriviaQuestion[] = [
   { id: 'anniversary', prompt: "What's our anniversary?", answer: import.meta.env.VITE_TRIVIA_ANNIVERSARY || '' },
 ];
 
+// Short noun-phrase per question, for roast copy - both the static pool and
+// the Groq prompt need something specific to point at ("our first kiss"),
+// not just a generic "our relationship trivia" that defaults to anniversary.
+const triviaTopics: Record<TriviaQuestion['id'], string> = {
+  firstDate: 'our first date',
+  firstKiss: 'our first kiss',
+  anniversary: 'our anniversary',
+};
+
 const roastPool: string[] = [
-  "Embarrassing, {name}. Truly, deeply embarrassing.",
-  "Wrong, {name}. I'd say I'm surprised, but I'm really not.",
-  "{name}, that guess was so bad it should be its own cautionary tale.",
-  "Imagine forgetting that, {name}. Couldn't be me.",
-  "Not even close, {name}. Not even the same decade of close.",
-  "That's somebody else's relationship, {name}. Ours has standards.",
-  "{name}, I've seen guesses. That wasn't one of the good ones.",
-  "Wrong date, {name}. At this point it's almost impressive.",
-  "Absolutely not, {name} — and yes, this is getting brought up forever.",
-  "{name}, bold guess. Shame it was catastrophically wrong.",
-  "Access denied, {name}. You failed the one test that was about you.",
-  "Try again, {name}. And maybe this time, actually think.",
-  "{name}, even autocorrect wouldn't suggest something that wrong.",
-  "That date belongs to somebody who pays attention. Not you, apparently.",
-  "Wrong. Confidently, spectacularly wrong, {name}.",
+  "{name}, you just failed {topic}. Bold strategy.",
+  "Wrong, {name}. {topic} was the one thing you had to remember.",
+  "That's not {topic}, {name}. That's a guess and a prayer.",
+  "{name}, forgetting {topic} is a whole personality trait at this point.",
+  "Incredible. Completely wrong about {topic}, {name}. Devastating, really.",
+  "Not a trick question, {name}. {topic}, and you still lost.",
+  "{name}, I've seen guesses. That {topic} answer wasn't one of the good ones.",
+  "Wrong about {topic}, {name}. At this point it's almost impressive.",
+  "{name}, your memory of {topic} is fiction. Compelling fiction, but fiction.",
+  "Nope, {name}. Try remembering {topic} instead of guessing.",
+  "{name}, that's not even close to {topic}. Wrong couple's timeline entirely.",
+  "Access denied, {name}. {topic} called, and it wants better guesses.",
+  "{name}, you said that with real confidence about {topic}. Iconic. Wrong, but iconic.",
+  "Wrong on {topic}, {name}. Somewhere, a calendar is disappointed in you.",
+  "{name}, {topic} is not a coin flip. You still managed to lose it.",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
@@ -139,9 +148,9 @@ function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function pickRoastLine(name: string): string {
+function pickRoastLine(name: string, topic: string): string {
   const line = roastPool[Math.floor(Math.random() * roastPool.length)];
-  return line.replace(/\{name\}/g, name);
+  return line.replace(/\{name\}/g, name).replace(/\{topic\}/g, topic);
 }
 
 // Fetches a freshly generated roast from /api/roast (Groq) to replace
@@ -150,14 +159,14 @@ function pickRoastLine(name: string): string {
 // out later, since that swap read as a bug, not a feature. Returns null on
 // any failure (missing key, rate limit, network, timeout) so callers can
 // fall back to the static pool instead of a broken login screen.
-async function fetchRoastLine(name: string): Promise<string | null> {
+async function fetchRoastLine(name: string, topic: string): Promise<string | null> {
   try {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 3000);
     const response = await fetch('/api/roast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, topic }),
       signal: controller.signal,
     });
     window.clearTimeout(timeout);
@@ -2361,16 +2370,17 @@ function AuthScreen() {
                 if (answerDate !== activeQuestion.answer) {
                   setMessage('');
                   setLeadMessage('');
+                  const roastTopic = triviaTopics[activeQuestion.id];
                   setActiveQuestion((current) => pickRandomQuestion(current.id));
                   setAnswerDate('');
                   triggerShake();
                   const token = roastToken.current;
                   const roastName = partner.name;
                   setLoading(true);
-                  const line = await fetchRoastLine(roastName);
+                  const line = await fetchRoastLine(roastName, roastTopic);
                   if (roastToken.current === token) {
                     setLoading(false);
-                    setLeadMessage(line || pickRoastLine(roastName));
+                    setLeadMessage(line || pickRoastLine(roastName, roastTopic));
                   }
                   return;
                 }
