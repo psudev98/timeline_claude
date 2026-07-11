@@ -990,7 +990,7 @@ function TimelineView({
         window.clearTimeout(boostTimer);
         boostTimer = window.setTimeout(() => setSwayBoost(false), 600);
       },
-      { threshold: Array.from({ length: 21 }, (_, index) => index / 20) },
+      { threshold: Array.from({ length: 6 }, (_, index) => index / 5) },
     );
 
     const cards = container.querySelectorAll<HTMLElement>('[data-memory-id]');
@@ -1098,7 +1098,7 @@ function TimelineView({
   );
 }
 
-function TimelineCard({
+const TimelineCard = React.memo(function TimelineCard({
   item,
   isEven,
   userId,
@@ -1320,7 +1320,14 @@ function TimelineCard({
       </div>
     </motion.article>
   );
-}
+},
+(prev, next) =>
+  prev.item === next.item &&
+  prev.isEven === next.isEven &&
+  prev.userId === next.userId &&
+  prev.isActive === next.isActive &&
+  prev.isPassed === next.isPassed &&
+  prev.scrollTilt === next.scrollTilt);
 
 function PhotoStack({
   images,
