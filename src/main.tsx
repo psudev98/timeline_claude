@@ -125,21 +125,21 @@ const triviaTopics: Record<TriviaQuestion['id'], string> = {
 };
 
 const roastPool: string[] = [
-  "{name}, you just failed {topic}. Bold strategy.",
-  "Wrong, {name}. {topic} was the one thing you had to remember.",
-  "That's not {topic}, {name}. That's a guess and a prayer.",
-  "{name}, forgetting {topic} is a whole personality trait at this point.",
-  "Incredible. Completely wrong about {topic}, {name}. Devastating, really.",
-  "Not a trick question, {name}. {topic}, and you still lost.",
-  "{name}, I've seen guesses. That {topic} answer wasn't one of the good ones.",
-  "Wrong about {topic}, {name}. At this point it's almost impressive.",
-  "{name}, your memory of {topic} is fiction. Compelling fiction, but fiction.",
-  "Nope, {name}. Try remembering {topic} instead of guessing.",
-  "{name}, that's not even close to {topic}. Wrong couple's timeline entirely.",
-  "Access denied, {name}. {topic} called, and it wants better guesses.",
-  "{name}, you said that with real confidence about {topic}. Iconic. Wrong, but iconic.",
-  "Wrong on {topic}, {name}. Somewhere, a calendar is disappointed in you.",
-  "{name}, {topic} is not a coin flip. You still managed to lose it.",
+  "{name}, that wasn't a wrong guess. That was an act of betrayal against {topic}.",
+  "Unforgivable, {name}. {topic}, and you blew it completely.",
+  "{name}, I hope it was worth it, being that wrong about {topic}.",
+  "That's not a guess, {name}. That's a crime against {topic}.",
+  "{name}, you had one job: remember {topic}. You failed spectacularly.",
+  "Wow. Just wow, {name}. {topic}, and nothing. Not even close.",
+  "{name}, {topic} deserved better than whatever that guess was.",
+  "Devastating, {name}. Truly one of the worst guesses about {topic} ever recorded.",
+  "{name}, that answer about {topic} was so wrong it should be studied.",
+  "No, {name}. Just — no. {topic} did not deserve that guess.",
+  "{name}, you really looked at {topic} and guessed THAT. Bold. Wrong. Bold.",
+  "That's it, {name}. {topic}, gone, forgotten, disrespected.",
+  "{name}, somewhere {topic} is filing a complaint about you.",
+  "Catastrophic, {name}. {topic}, and you still couldn't get it right.",
+  "{name}, that guess about {topic} will be remembered. As a warning.",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
