@@ -116,21 +116,21 @@ const triviaQuestions: TriviaQuestion[] = [
 ];
 
 const roastPool: string[] = [
-  "Nice try, {name}, but our love story doesn't work that way.",
-  "Wrong! Did you forget already, {name}? Rude.",
-  "{name}, that's adorable, but also completely incorrect.",
-  "Nope. Try harder, {name} — this is important history here.",
-  "Close, {name}... if 'close' meant 'not even in the same year.'",
-  "That's someone else's memory, {name}. Try ours.",
-  "{name}, I'm judging you a little bit right now.",
-  "Wrong date, {name}. Maybe write it down next time?",
-  "Not quite, {name} — and yes, this is going in the relationship archives.",
-  "{name}, that guess was bold. Boldly wrong, but bold.",
-  "Access denied, {name}. Sentimental value insufficient.",
-  "Try again, {name}. Our memories deserve better guesses than that.",
-  "{name}, even the algorithm is disappointed.",
-  "That date belongs to somebody else's love story.",
-  "Wrong. But I admire the confidence.",
+  "Embarrassing, {name}. Truly, deeply embarrassing.",
+  "Wrong, {name}. I'd say I'm surprised, but I'm really not.",
+  "{name}, that guess was so bad it should be its own cautionary tale.",
+  "Imagine forgetting that, {name}. Couldn't be me.",
+  "Not even close, {name}. Not even the same decade of close.",
+  "That's somebody else's relationship, {name}. Ours has standards.",
+  "{name}, I've seen guesses. That wasn't one of the good ones.",
+  "Wrong date, {name}. At this point it's almost impressive.",
+  "Absolutely not, {name} — and yes, this is getting brought up forever.",
+  "{name}, bold guess. Shame it was catastrophically wrong.",
+  "Access denied, {name}. You failed the one test that was about you.",
+  "Try again, {name}. And maybe this time, actually think.",
+  "{name}, even autocorrect wouldn't suggest something that wrong.",
+  "That date belongs to somebody who pays attention. Not you, apparently.",
+  "Wrong. Confidently, spectacularly wrong, {name}.",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
@@ -144,14 +144,16 @@ function pickRoastLine(name: string): string {
   return line.replace(/\{name\}/g, name);
 }
 
-// Best-effort upgrade over pickRoastLine - a freshly generated line from
-// /api/roast (Groq) instead of the static pool. Returns null on any failure
-// (missing key, rate limit, network, timeout) so callers can keep showing
-// the static fallback instead of a broken login screen.
+// Fetches a freshly generated roast from /api/roast (Groq) to replace
+// pickRoastLine's static pool. The caller awaits this (with a visible
+// loading state) rather than showing a static line first and swapping it
+// out later, since that swap read as a bug, not a feature. Returns null on
+// any failure (missing key, rate limit, network, timeout) so callers can
+// fall back to the static pool instead of a broken login screen.
 async function fetchRoastLine(name: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 4000);
+    const timeout = window.setTimeout(() => controller.abort(), 3000);
     const response = await fetch('/api/roast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2358,15 +2360,18 @@ function AuthScreen() {
                 }
                 if (answerDate !== activeQuestion.answer) {
                   setMessage('');
-                  setLeadMessage(pickRoastLine(partner.name));
+                  setLeadMessage('');
                   setActiveQuestion((current) => pickRandomQuestion(current.id));
                   setAnswerDate('');
                   triggerShake();
                   const token = roastToken.current;
                   const roastName = partner.name;
-                  fetchRoastLine(roastName).then((line) => {
-                    if (line && roastToken.current === token) setLeadMessage(line);
-                  });
+                  setLoading(true);
+                  const line = await fetchRoastLine(roastName);
+                  if (roastToken.current === token) {
+                    setLoading(false);
+                    setLeadMessage(line || pickRoastLine(roastName));
+                  }
                   return;
                 }
                 setLoading(true);
