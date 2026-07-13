@@ -194,12 +194,12 @@ type DraftMemory = {
   unlockAt: string;
 };
 
-function useNow() {
+function useNow(intervalMs = 1000) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    const timer = window.setInterval(() => setNow(new Date()), intervalMs);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [intervalMs]);
   return now;
 }
 
@@ -263,7 +263,12 @@ function App() {
 }
 
 function RomanceApp({ session }: { session: Session }) {
-  const now = useNow();
+  // Everything below that reads `now` only needs day/minute granularity
+  // (countdowns, "this day" resurfacing, stats). A 1s tick here used to
+  // re-render this entire component tree 60x/minute; a slow tick keeps
+  // those derived values fresh while the live seconds display lives in its
+  // own isolated HeroCounter below.
+  const now = useNow(60000);
   const elapsed = elapsedParts(now);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [letters, setLetters] = useState<LoveLetter[]>([]);
@@ -746,12 +751,7 @@ function RomanceApp({ session }: { session: Session }) {
           <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
             Our Little Timeline
           </motion.h1>
-          <div className="counter">
-            <TimePill value={elapsed.days} label="days" />
-            <TimePill value={elapsed.hours} label="hours" />
-            <TimePill value={elapsed.minutes} label="mins" />
-            <TimePill value={elapsed.seconds} label="secs" pulse />
-          </div>
+          <HeroCounter />
         </div>
       </section>
 
@@ -881,6 +881,11 @@ function RomanceApp({ session }: { session: Session }) {
             onTheme={setTheme}
             onSave={updateProfile}
             onClose={() => setSettingsOpen(false)}
+            musicOn={musicOn}
+            hasPlaylist={Boolean(playlist[0])}
+            onToggleMusic={() => setMusicOn((value) => !value)}
+            onExport={() => window.print()}
+            onSignOut={() => supabase.auth.signOut()}
           />
         )}
         {letterOpen && (
@@ -915,6 +920,22 @@ function ViewButton({
       {children}
       <span className="tab-label">{label}</span>
     </button>
+  );
+}
+
+function HeroCounter() {
+  // Ticks every second on its own - isolated here so the once-a-second
+  // re-render stays scoped to these four pills instead of cascading through
+  // the whole app tree (see the `now` comment in RomanceApp).
+  const now = useNow();
+  const elapsed = elapsedParts(now);
+  return (
+    <div className="counter">
+      <TimePill value={elapsed.days} label="days" />
+      <TimePill value={elapsed.hours} label="hours" />
+      <TimePill value={elapsed.minutes} label="mins" />
+      <TimePill value={elapsed.seconds} label="secs" pulse />
+    </div>
   );
 }
 
@@ -2100,12 +2121,22 @@ function SettingsPanel({
   onTheme,
   onSave,
   onClose,
+  musicOn,
+  hasPlaylist,
+  onToggleMusic,
+  onExport,
+  onSignOut,
 }: {
   profile: Profile;
   theme: ThemeName;
   onTheme: (theme: ThemeName) => void;
   onSave: (profile: Profile) => void;
   onClose: () => void;
+  musicOn: boolean;
+  hasPlaylist: boolean;
+  onToggleMusic: () => void;
+  onExport: () => void;
+  onSignOut: () => void;
 }) {
   const [draft, setDraft] = useState(profile);
   const themes: Array<{ id: ThemeName; label: string }> = [
@@ -2133,6 +2164,22 @@ function SettingsPanel({
         </div>
         <button className="primary-button"><Sparkles size={18} />Save profile</button>
       </form>
+      <div className="settings-actions">
+        <span className="settings-actions-label">Quick actions</span>
+        <div className="settings-actions-row">
+          {hasPlaylist && (
+            <button type="button" className="icon-button" onClick={onToggleMusic} title="Music mode">
+              {musicOn ? <Pause size={18} /> : <Music2 size={18} />}
+            </button>
+          )}
+          <button type="button" className="icon-button" onClick={onExport} title="Export keepsake">
+            <Download size={18} />
+          </button>
+          <button type="button" className="icon-button sign-out" onClick={onSignOut} title="Sign out">
+            <LogOut size={18} />
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

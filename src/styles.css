@@ -792,6 +792,32 @@ h1 {
   line-height: 1.45;
 }
 
+.settings-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(41, 24, 24, 0.1);
+}
+
+.settings-actions-label {
+  color: #795e51;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.settings-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button.sign-out {
+  color: #b5344a;
+  background: #ffe0e6;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -2496,6 +2522,7 @@ select {
   .countdown-list {
     gap: 14px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .countdown-list > div {
@@ -2513,6 +2540,7 @@ select {
   .favorites-row {
     display: flex;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .favorites-row .mini-memory {
