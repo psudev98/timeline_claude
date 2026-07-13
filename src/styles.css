@@ -457,13 +457,42 @@ h1 {
 }
 
 @media (max-width: 680px) {
+  /* On desktop the header floats over the top of two full-height (100vh)
+     side-by-side panels, so its size never competes with the name labels
+     anchored at the very bottom of each panel. Stacked 50/50 on mobile
+     there's no such headroom - so instead of overlaying, the header takes
+     its own place in a column flow above the panels, sized compactly, and
+     the panels split whatever height remains. */
+  .partner-picker-screen {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .partner-picker-header {
+    position: relative;
+    inset: auto;
+    padding: 16px 20px 14px;
+    background: linear-gradient(180deg, rgba(35, 18, 17, 0.92), rgba(35, 18, 17, 0.74));
+  }
+
+  .partner-picker-header h1 {
+    font-size: clamp(1.7rem, 8vw, 2.3rem);
+    line-height: 1.05;
+  }
+
+  .partner-picker-header .auth-prompt {
+    font-size: 0.88rem;
+  }
+
   .partner-panels {
+    flex: 1;
+    min-height: 0;
     flex-direction: column;
   }
 
   .partner-panel {
-    flex: 1 1 50%;
-    min-height: 50vh;
+    flex: 1 1 0;
+    min-height: 0;
   }
 
   .partner-panel.is-hovered {
@@ -790,6 +819,32 @@ h1 {
   margin: 6px 0 0;
   color: #795e51;
   line-height: 1.45;
+}
+
+.settings-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(41, 24, 24, 0.1);
+}
+
+.settings-actions-label {
+  color: #795e51;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.settings-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button.sign-out {
+  color: #b5344a;
+  background: #ffe0e6;
 }
 
 label {
@@ -2496,6 +2551,7 @@ select {
   .countdown-list {
     gap: 14px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .countdown-list > div {
@@ -2513,6 +2569,7 @@ select {
   .favorites-row {
     display: flex;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .favorites-row .mini-memory {
