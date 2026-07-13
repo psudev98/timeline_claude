@@ -533,6 +533,30 @@ h1 {
   font-weight: 700;
 }
 
+.roast-source-badge {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.roast-source-badge.llm {
+  color: #8c3150;
+  background: rgba(233, 81, 125, 0.16);
+}
+
+.roast-source-badge.fallback {
+  color: #6c3f36;
+  background: rgba(108, 63, 54, 0.12);
+}
+
 .sign-out {
   position: fixed;
   top: 18px;
