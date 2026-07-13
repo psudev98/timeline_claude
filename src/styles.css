@@ -457,13 +457,42 @@ h1 {
 }
 
 @media (max-width: 680px) {
+  /* On desktop the header floats over the top of two full-height (100vh)
+     side-by-side panels, so its size never competes with the name labels
+     anchored at the very bottom of each panel. Stacked 50/50 on mobile
+     there's no such headroom - so instead of overlaying, the header takes
+     its own place in a column flow above the panels, sized compactly, and
+     the panels split whatever height remains. */
+  .partner-picker-screen {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .partner-picker-header {
+    position: relative;
+    inset: auto;
+    padding: 16px 20px 14px;
+    background: linear-gradient(180deg, rgba(35, 18, 17, 0.92), rgba(35, 18, 17, 0.74));
+  }
+
+  .partner-picker-header h1 {
+    font-size: clamp(1.7rem, 8vw, 2.3rem);
+    line-height: 1.05;
+  }
+
+  .partner-picker-header .auth-prompt {
+    font-size: 0.88rem;
+  }
+
   .partner-panels {
+    flex: 1;
+    min-height: 0;
     flex-direction: column;
   }
 
   .partner-panel {
-    flex: 1 1 50%;
-    min-height: 50vh;
+    flex: 1 1 0;
+    min-height: 0;
   }
 
   .partner-panel.is-hovered {
