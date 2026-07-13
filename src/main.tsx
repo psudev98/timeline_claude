@@ -22,6 +22,7 @@ import {
   LogOut,
   MapPin,
   Music2,
+  Package,
   Pause,
   Plus,
   Send,
@@ -33,6 +34,7 @@ import {
   UploadCloud,
   Volume2,
   X,
+  Zap,
 } from 'lucide-react';
 import {
   AnimatePresence,
@@ -2260,6 +2262,7 @@ function AuthScreen() {
   const [activeQuestion, setActiveQuestion] = useState<TriviaQuestion>(() => pickRandomQuestion());
   const [message, setMessage] = useState('');
   const [leadMessage, setLeadMessage] = useState('');
+  const [roastSource, setRoastSource] = useState<'llm' | 'fallback' | null>(null);
   const [loading, setLoading] = useState(false);
   const [shake, setShake] = useState(false);
   const [burst, setBurst] = useState(0);
@@ -2296,6 +2299,7 @@ function AuthScreen() {
     setAnswerDate('');
     setMessage('');
     setLeadMessage('');
+    setRoastSource(null);
   }
 
   function goBack() {
@@ -2304,6 +2308,7 @@ function AuthScreen() {
     setAnswerDate('');
     setMessage('');
     setLeadMessage('');
+    setRoastSource(null);
   }
 
   function avatarUrl(id: PartnerId) {
@@ -2400,6 +2405,7 @@ function AuthScreen() {
                 roastToken.current += 1;
                 if (!partner.email) {
                   setLeadMessage('');
+                  setRoastSource(null);
                   setMessage(
                     `No login email is configured for ${partner.name} yet (missing VITE_PARTNER_${partner.id.toUpperCase()}_EMAIL).`,
                   );
@@ -2408,6 +2414,7 @@ function AuthScreen() {
                 }
                 if (!activeQuestion.answer || !partner.authSecret) {
                   setLeadMessage('Not quite ready for you yet —');
+                  setRoastSource(null);
                   setMessage(
                     `This trivia question isn't fully wired up yet (missing the answer or ${partner.name}'s hidden password in the env vars). Ask whoever manages the .env file to fill it in.`,
                   );
@@ -2417,6 +2424,7 @@ function AuthScreen() {
                 if (answerDate !== activeQuestion.answer) {
                   setMessage('');
                   setLeadMessage('');
+                  setRoastSource(null);
                   const roastTopic = triviaTopics[activeQuestion.id];
                   setActiveQuestion((current) => pickRandomQuestion(current.id));
                   setAnswerDate('');
@@ -2428,6 +2436,7 @@ function AuthScreen() {
                   if (roastToken.current === token) {
                     setLoading(false);
                     setLeadMessage(line || pickRoastLine(roastName, roastTopic));
+                    setRoastSource(line ? 'llm' : 'fallback');
                   }
                   return;
                 }
@@ -2439,10 +2448,12 @@ function AuthScreen() {
                 setLoading(false);
                 if (error) {
                   setLeadMessage('The universe hit a snag —');
+                  setRoastSource(null);
                   setMessage(error.message);
                   triggerShake();
                 } else {
                   setLeadMessage('');
+                  setRoastSource(null);
                   setMessage('');
                 }
               }}
@@ -2466,6 +2477,12 @@ function AuthScreen() {
                 <p className="form-message">
                   {leadMessage && <span className="form-message-lead">{leadMessage}</span>}
                   {message}
+                  {roastSource && (
+                    <span className={`roast-source-badge ${roastSource}`}>
+                      {roastSource === 'llm' ? <Zap size={11} /> : <Package size={11} />}
+                      {roastSource === 'llm' ? 'fresh from the AI' : 'classic roast'}
+                    </span>
+                  )}
                 </p>
               )}
               <button className="primary-button" disabled={loading}>
