@@ -7,21 +7,25 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const KNOWN_TOPICS = new Set(['our first date', 'our first kiss', 'our anniversary']);
+const KNOWN_GENDERS = new Set(['male', 'female']);
+const PRONOUNS: Record<string, string> = { male: 'he/him', female: 'she/her' };
 
 const SYSTEM_PROMPT =
   "You write single one-line roasts for a private couple's relationship-timeline app. " +
   'A partner just answered a trivia question wrong. The user message tells you exactly ' +
-  'which relationship fact they got wrong - roast them specifically about THAT one. Never ' +
-  'substitute a different milestone (if the topic is "our first kiss", the roast must be ' +
-  'about the first kiss, not the anniversary or first date). Do not hold back on intensity: ' +
-  'go all-in, merciless, scathing, theatrical, maximum comedic savagery - dramatic ' +
-  'exaggeration, mock outrage, biting sarcasm, escalating hyperbole, real venom. This is the ' +
-  'harshest, least forgiving version of this roast you can write. The one non-negotiable ' +
-  'limit, regardless of how brutal the tone gets: attack ONLY their failure to remember the ' +
-  'given topic - never their appearance, body, family, general intelligence, or anything ' +
-  'that could land as a real insecurity. No slurs, no crude or sexual language. Use their ' +
-  'first name naturally. One short sentence, under 20 words. Reply with ONLY the roast line ' +
-  '- no quotation marks, no emoji, no preamble.';
+  'which relationship fact they got wrong and their pronouns - roast them specifically ' +
+  'about THAT one, using those pronouns naturally if you refer to them in the third person. ' +
+  'Never substitute a different milestone (if the topic is "our first kiss", the roast must ' +
+  'be about the first kiss, not the anniversary or first date). Go completely off the leash ' +
+  'on intensity: ruthless, savage, no mercy, maximum comedic cruelty - vicious exaggeration, ' +
+  'scathing mockery, cutting sarcasm, relentless escalating hyperbole. Do not soften it, do ' +
+  'not hedge, do not add a kind aside at the end. This is the single most brutal version of ' +
+  'this roast you are capable of writing. The one non-negotiable limit, regardless of how ' +
+  'vicious the tone gets: attack ONLY their failure to remember the given topic - never their ' +
+  'appearance, body, family, general intelligence, or anything that could land as a real ' +
+  'insecurity. No slurs, no crude or sexual language. Use their first name naturally. One ' +
+  'short sentence, under 20 words. Reply with ONLY the roast line - no quotation marks, no ' +
+  'emoji, no preamble.';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -37,6 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const name = typeof req.body?.name === 'string' && req.body.name.trim() ? req.body.name.trim().slice(0, 40) : 'love';
   const topic = typeof req.body?.topic === 'string' && KNOWN_TOPICS.has(req.body.topic) ? req.body.topic : 'our relationship trivia';
+  const gender = typeof req.body?.gender === 'string' && KNOWN_GENDERS.has(req.body.gender) ? req.body.gender : null;
+  const pronouns = gender ? PRONOUNS[gender] : 'they/them';
 
   try {
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -51,7 +57,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         max_tokens: 60,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Write one brutal, funny roast line for ${name}, who just got ${topic} wrong.` },
+          {
+            role: 'user',
+            content: `Write one savage, brutal, funny roast line for ${name} (pronouns: ${pronouns}), who just got ${topic} wrong.`,
+          },
         ],
       }),
     });
