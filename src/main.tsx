@@ -128,21 +128,21 @@ const triviaTopics: Record<TriviaQuestion['id'], string> = {
 };
 
 const roastPool: string[] = [
-  "{name}, that wasn't a wrong guess. That was an act of betrayal against {topic}.",
-  "Unforgivable, {name}. {topic}, and you blew it completely.",
-  "{name}, I hope it was worth it, being that wrong about {topic}.",
-  "That's not a guess, {name}. That's a crime against {topic}.",
-  "{name}, you had one job: remember {topic}. You failed spectacularly.",
-  "Wow. Just wow, {name}. {topic}, and nothing. Not even close.",
-  "{name}, {topic} deserved better than whatever that guess was.",
-  "Devastating, {name}. Truly one of the worst guesses about {topic} ever recorded.",
-  "{name}, that answer about {topic} was so wrong it should be studied.",
-  "No, {name}. Just — no. {topic} did not deserve that guess.",
-  "{name}, you really looked at {topic} and guessed THAT. Bold. Wrong. Bold.",
-  "That's it, {name}. {topic}, gone, forgotten, disrespected.",
-  "{name}, somewhere {topic} is filing a complaint about you.",
-  "Catastrophic, {name}. {topic}, and you still couldn't get it right.",
-  "{name}, that guess about {topic} will be remembered. As a warning.",
+  "{name}, you're sleeping on the couch tonight, and {topic} isn't even sorry about it.",
+  "Bold guess, {name}. {topic} is already drafting the breakup speech you'll never get to hear.",
+  "{name}, that guess about {topic} was so wrong it just became a cautionary tale.",
+  "Congratulations, {name} — you've officially been benched from date-night trivia. {topic} deserved better.",
+  "{name}, {topic} called. It wants an apology, flowers, and a written statement.",
+  "That wasn't a guess, {name}, that was a hostage negotiation gone wrong. {topic} lost.",
+  "{name}, forgetting {topic} like that is a crime scene, and you left prints everywhere.",
+  "Wow, {name}. {topic}, and you swung so hard you hit next year.",
+  "{name}, {topic} deserves a lawyer after that guess, because you clearly abandoned it.",
+  "That guess earns you zero stars, {name}, and {topic} is leaving the review.",
+  "{name}, you just failed {topic} so badly it's getting its own documentary.",
+  "Somewhere, {topic} is changing the locks on you, {name}.",
+  "{name}, that answer was a war crime against {topic}. The tribunal is already in session.",
+  "{topic}, {name}? Really? Even a coin flip would've had better odds than you.",
+  "{name}, you don't even deserve a redo. {topic} is filing this under 'never forget - apparently you did.'",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
