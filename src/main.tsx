@@ -85,16 +85,14 @@ const moodOptions = ['funny', 'soft', 'chaotic', 'first time', 'miss you'];
 const profileColors = ['#e9517d', '#5bbfa5', '#f2a94a', '#6979d9', '#a65d9f'];
 
 type PartnerId = 'deva' | 'aadi';
-type PartnerGender = 'male' | 'female';
 
-const partners: { id: PartnerId; name: string; color: string; email: string; authSecret: string; gender: PartnerGender }[] = [
+const partners: { id: PartnerId; name: string; color: string; email: string; authSecret: string }[] = [
   {
     id: 'deva',
     name: 'Deva',
     color: '#e9517d',
     email: import.meta.env.VITE_PARTNER_DEVA_EMAIL || '',
     authSecret: import.meta.env.VITE_PARTNER_DEVA_AUTH_SECRET || '',
-    gender: 'male',
   },
   {
     id: 'aadi',
@@ -102,7 +100,6 @@ const partners: { id: PartnerId; name: string; color: string; email: string; aut
     color: '#5bbfa5',
     email: import.meta.env.VITE_PARTNER_AADI_EMAIL || '',
     authSecret: import.meta.env.VITE_PARTNER_AADI_AUTH_SECRET || '',
-    gender: 'female',
   },
 ];
 
@@ -143,6 +140,51 @@ const roastPool: string[] = [
   "{name}, that answer was a war crime against {topic}. The tribunal is already in session.",
   "{topic}, {name}? Really? Even a coin flip would've had better odds than you.",
   "{name}, you don't even deserve a redo. {topic} is filing this under 'never forget - apparently you did.'",
+  "{name}, the dog remembers {topic} better than you do, and the dog wasn't even born yet.",
+  "That's a new record, {name} — wrong about {topic} in under three seconds.",
+  "{name}, pack a bag. The couch has better memory retention than you tonight.",
+  "Somewhere a wedding planner just heard that guess about {topic} and quit on the spot, {name}.",
+  "{name}, you didn't just get {topic} wrong, you invented a whole new timeline where it never happened.",
+  "Brutal, {name}. {topic} is now suing you in the court of public opinion, and you're losing.",
+  "{name}, that guess was so far off, {topic} had to look up who you even are.",
+  "Legendary failure, {name}. Historians will study how badly you botched {topic}.",
+  "{name}, {topic} just texted the group chat about you. It's not going well.",
+  "That guess about {topic} was a five-alarm fire, {name}, and you brought marshmallows.",
+  "{name}, even your search history knows {topic} better than you just proved you do.",
+  "Absolutely feral guess, {name}. {topic} is drafting a eulogy for your memory.",
+  "{name}, you just gaslit yourself about {topic}, and somehow still lost the argument.",
+  "That's not forgetting, {name}, that's a full witness relocation program away from {topic}.",
+  "{name}, {topic} deserves a moment of silence after that guess. And so do you.",
+  "Staggering, {name}. Whatever you were thinking about, it clearly wasn't {topic}.",
+  "{name}, the trivia gods just revoked your license to be trusted with dates.",
+  "That guess earns you a permanent asterisk next to {topic}, {name}. Forever.",
+  "{name}, {topic} watched that guess happen and immediately filed a restraining order on your memory.",
+  "Devastatingly wrong, {name}. {topic} is now considering other options.",
+  "{name}, you just made {topic} the villain origin story of this relationship.",
+  "That answer was so far from {topic}, {name}, it needs its own passport.",
+  "{name}, {topic} is currently reviewing its life choices, starting with you.",
+  "Painful, {name}. {topic}, and you still managed to make it worse by guessing at all.",
+  "{name}, somewhere a calendar just wept for {topic}.",
+  "That's it, {name}. {topic} has officially blocked your number.",
+  "{name}, you brought a guess to a memory fight and lost spectacularly to {topic}.",
+  "Unbelievable, {name}. {topic}, and you still went with confidence. Bold. Doomed. Bold.",
+  "{name}, {topic} just got a lawyer, and honestly? Good for {topic}.",
+  "That guess deserves its own true-crime podcast, {name}. Season one: {topic}.",
+  "{name}, you didn't guess wrong about {topic}. You guessed wrong about everything.",
+  "Ice cold, {name}. {topic} just felt that from across the room.",
+  "{name}, that answer about {topic} is why we can't have nice things.",
+  "Spectacular collapse, {name}. {topic} watched it happen in real time.",
+  "{name}, {topic} is now a cautionary tale told to future couples everywhere.",
+  "That guess was so wrong, {name}, {topic} is considering witness protection from you.",
+  "{name}, you just failed a pop quiz on your own love story. {topic}, specifically.",
+  "Ruthless honesty, {name}: that guess about {topic} was an embarrassment to guessing itself.",
+  "{name}, {topic} is drafting a strongly worded letter to your memory, care of your heart.",
+  "That's the kind of wrong, {name}, that gets brought up at every anniversary from now on. {topic}, remember?",
+  "{name}, {topic} just gave up on you mid-guess. Can you blame it?",
+  "Wrecked, {name}. {topic} deserved a hero and got that guess instead.",
+  "{name}, you approached {topic} like a stranger and left like an enemy.",
+  "That guess, {name}, is why {topic} is filing a missing person's report on your memory.",
+  "{name}, {topic} just changed its relationship status to 'it's complicated' because of you.",
 ];
 
 function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
@@ -151,34 +193,18 @@ function pickRandomQuestion(excludeId?: TriviaQuestion['id']): TriviaQuestion {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function pickRoastLine(name: string, topic: string): string {
-  const line = roastPool[Math.floor(Math.random() * roastPool.length)];
-  return line.replace(/\{name\}/g, name).replace(/\{topic\}/g, topic);
-}
-
-// Fetches a freshly generated roast from /api/roast (Groq) to replace
-// pickRoastLine's static pool. The caller awaits this (with a visible
-// loading state) rather than showing a static line first and swapping it
-// out later, since that swap read as a bug, not a feature. Returns null on
-// any failure (missing key, rate limit, network, timeout) so callers can
-// fall back to the static pool instead of a broken login screen.
-async function fetchRoastLine(name: string, topic: string, gender: PartnerGender): Promise<string | null> {
-  try {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 3000);
-    const response = await fetch('/api/roast', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, topic, gender }),
-      signal: controller.signal,
-    });
-    window.clearTimeout(timeout);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return typeof data.line === 'string' && data.line.trim() ? data.line.trim() : null;
-  } catch {
-    return null;
+// Picks a random line and fills in the placeholders. `previous` (the roast
+// currently on screen, if any) is re-rolled against up to a few times so the
+// same line doesn't show up twice in a row - with 60 lines in the pool that's
+// a rare coincidence rather than a real repetition problem, but it's a cheap
+// guarantee against the one case players would actually notice.
+function pickRoastLine(name: string, topic: string, previous?: string): string {
+  const render = (template: string) => template.replace(/\{name\}/g, name).replace(/\{topic\}/g, topic);
+  let rendered = render(roastPool[Math.floor(Math.random() * roastPool.length)]);
+  for (let attempt = 0; attempt < 5 && rendered === previous; attempt++) {
+    rendered = render(roastPool[Math.floor(Math.random() * roastPool.length)]);
   }
+  return rendered;
 }
 
 type DraftMemory = {
@@ -2274,7 +2300,6 @@ function AuthScreen() {
   const [hoveredId, setHoveredId] = useState<PartnerId | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const partner = partners.find((candidate) => candidate.id === selectedPartner) ?? null;
-  const roastToken = useRef(0);
 
   useEffect(() => {
     if (window.localStorage.getItem('romance.autoLogoutReason') === 'inactivity') {
@@ -2292,7 +2317,6 @@ function AuthScreen() {
   }
 
   function choosePartner(id: PartnerId) {
-    roastToken.current += 1;
     setSelectedPartner(id);
     setBurst((value) => value + 1);
     setActiveQuestion(pickRandomQuestion());
@@ -2302,7 +2326,6 @@ function AuthScreen() {
   }
 
   function goBack() {
-    roastToken.current += 1;
     setSelectedPartner(null);
     setAnswerDate('');
     setMessage('');
@@ -2400,7 +2423,6 @@ function AuthScreen() {
               style={{ '--partner-color': partner.color } as React.CSSProperties}
               onSubmit={async (event) => {
                 event.preventDefault();
-                roastToken.current += 1;
                 if (!partner.email) {
                   setLeadMessage('');
                   setMessage(
@@ -2419,19 +2441,11 @@ function AuthScreen() {
                 }
                 if (answerDate !== activeQuestion.answer) {
                   setMessage('');
-                  setLeadMessage('');
                   const roastTopic = triviaTopics[activeQuestion.id];
                   setActiveQuestion((current) => pickRandomQuestion(current.id));
                   setAnswerDate('');
                   triggerShake();
-                  const token = roastToken.current;
-                  const roastName = partner.name;
-                  setLoading(true);
-                  const line = await fetchRoastLine(roastName, roastTopic, partner.gender);
-                  if (roastToken.current === token) {
-                    setLoading(false);
-                    setLeadMessage(line || pickRoastLine(roastName, roastTopic));
-                  }
+                  setLeadMessage((previous) => pickRoastLine(partner.name, roastTopic, previous));
                   return;
                 }
                 setLoading(true);

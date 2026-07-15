@@ -80,7 +80,7 @@ The login screen no longer asks for an email or a fixed typed password. Instead:
 - The correct answer to each question is a `YYYY-MM-DD` date stored in an env var (see below) - it's compared entirely in the browser and is never sent to Supabase.
 - Only once the trivia answer matches does the app sign in behind the scenes using a separate, hidden per-partner password (also an env var) that the person never sees or types.
 - Set each account's real Supabase Auth password to that hidden per-partner value (`VITE_PARTNER_DEVA_AUTH_SECRET` / `VITE_PARTNER_AADI_AUTH_SECRET`), **not** to a date anymore.
-- A wrong guess never touches Supabase at all - it just shows a playful message and rolls a new question.
+- A wrong guess never touches Supabase at all - it picks a random brutal/funny roast line from a large static pool in `src/main.tsx`, shows it, and rolls a new question.
 - The email each card signs in with still comes from environment variables, not from typing - see "Environment variables" below.
 
 After signing in, each person can choose a display name and profile color from the settings button.
@@ -108,16 +108,6 @@ The two `VITE_PARTNER_*_EMAIL` values are what let the login screen sign each pe
 The `VITE_PARTNER_*_AUTH_SECRET` and `VITE_TRIVIA_*` values follow the same rule: kept out of the GitHub repo, but still bundled into the shipped JavaScript like everything else here. Treat the auth-secret values as real passwords anyway (long, random, unique per partner) since they literally are each account's actual Supabase Auth password now.
 
 For local development, put the same values in `.env.local`.
-
-### Wrong-guess roasts (optional, needs one more var)
-
-```bash
-GROQ_API_KEY=your_groq_api_key
-```
-
-Get a free key at [console.groq.com](https://console.groq.com) - no credit card needed. Unlike every other var above, **do not prefix this one with `VITE_`**. It's read server-side only, by the Vercel serverless function at `api/roast.ts`, and must never end up in the shipped client JS (a leaked key could be used by anyone to burn the shared free-tier rate limit). When a partner answers the trivia question wrong, the login screen shows a brief loading spinner while it asks Groq for a freshly generated roast line; if `GROQ_API_KEY` isn't set, or the request fails or times out (3s), it falls back to a line from the static `roastPool` instead - there's no user-visible error either way.
-
-Local dev note: plain `npm run dev` (Vite) does not serve the `/api` folder, so the roast endpoint will 404 locally and silently fall back to the static pool - to actually exercise `api/roast.ts` locally, run `vercel dev` instead (needs the Vercel CLI and the project linked with `vercel link`).
 
 ## 4. Install and run
 
