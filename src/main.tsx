@@ -78,7 +78,7 @@ import type {
 } from './types';
 import './styles.css';
 
-const anniversary = new Date('2026-05-15T20:00:00+05:30');
+const anniversary = new Date('2026-05-20T00:05:00+05:30');
 const fallbackImage =
   'https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=1200&q=85';
 const moodOptions = ['funny', 'soft', 'chaotic', 'first time', 'miss you'];
@@ -775,10 +775,10 @@ function RomanceApp({ session }: { session: Session }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            Our story, live and still unfolding
+            A love story that's still being written
           </motion.p>
           <motion.h1 initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-            Our Little Timeline
+            Our Forever, So Far
           </motion.h1>
           <HeroCounter />
         </div>
